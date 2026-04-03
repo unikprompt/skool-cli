@@ -1,0 +1,365 @@
+import { readFileSync } from "node:fs";
+import { BrowserManager } from "./browser-manager.js";
+import { PageOps } from "./page-ops.js";
+import { SkoolApi } from "./skool-api.js";
+import { markdownToHtml, structuredContentToHtml } from "./html-generator.js";
+import type {
+  CreateLessonOptions,
+  CreatePostOptions,
+  OperationResult,
+  SkoolPost,
+  SkoolMember,
+} from "./types.js";
+
+/**
+ * High-level Skool client.
+ * This is the main API for both CLI commands and programmatic usage.
+ */
+export class SkoolClient {
+  private browser: BrowserManager;
+  private ops: PageOps;
+  private api: SkoolApi;
+
+  // Cached IDs for API calls
+  private cachedGroupId = "";
+  private cachedUserId = "";
+  private cachedRootId = "";
+
+  constructor() {
+    this.browser = new BrowserManager();
+    this.ops = new PageOps(this.browser);
+    this.api = new SkoolApi(this.browser);
+  }
+
+  /** Discover group_id, user_id, root_id for API calls */
+  private async discoverIds(
+    groupSlug: string,
+    courseName?: string
+  ): Promise<{ groupId: string; userId: string; rootId: string }> {
+    // Return cached if available
+    if (this.cachedGroupId && this.cachedUserId && this.cachedRootId) {
+      return {
+        groupId: this.cachedGroupId,
+        userId: this.cachedUserId,
+        rootId: this.cachedRootId,
+      };
+    }
+
+    const page = await this.browser.getPage();
+
+    // Navigate to classroom
+    await this.ops.gotoClassroom(groupSlug);
+
+    // Enter course
+    if (courseName) {
+      await page.getByText(courseName, { exact: false }).first().click();
+    } else {
+      const courseLink = page.locator('a[href*="/classroom/"]').first();
+      if ((await courseLink.count()) > 0) await courseLink.click();
+    }
+    await page.waitForTimeout(3000);
+
+    // Get group_id from telemetry/page
+    let groupId = "";
+    page.on("request", (req) => {
+      const body = req.postData();
+      if (body) {
+        const gm = body.match(/"group_id"\s*:\s*"([a-f0-9]{32})"/);
+        if (gm && !groupId) groupId = gm[1];
+      }
+    });
+
+    // Get group_id from page assets if not captured
+    if (!groupId) {
+      groupId = await page.evaluate(() => {
+        const str = document.documentElement.innerHTML;
+        const m = str.match(/[a-f0-9]{32}/);
+        // Look for the specific pattern in og:image URLs
+        const ogMatch = str.match(/assets\.skool\.com\/f\/([a-f0-9]{32})/);
+        return ogMatch ? ogMatch[1] : (m ? m[0] : "");
+      });
+    }
+
+    // Get user_id from JWT auth_token cookie
+    let userId = "";
+    const cookies = await page.context().cookies();
+    const authCookie = cookies.find((c) => c.name === "auth_token");
+    if (authCookie) {
+      try {
+        const payload = JSON.parse(
+          Buffer.from(authCookie.value.split(".")[1], "base64").toString()
+        );
+        userId = payload.user_id || payload.sub || payload.id || "";
+      } catch { /* ignore */ }
+    }
+
+    // Get root_id by intercepting the POST to api2.skool.com when doing "Add page"
+    // Then DELETE the unwanted "New page" that gets created
+    let rootId = "";
+    let tempPageId = "";
+
+    const rootIdPromise = new Promise<{ rootId: string; pageId: string }>((resolve) => {
+      const timeout = setTimeout(() => resolve({ rootId: "", pageId: "" }), 15000);
+      page.on("response", async (res) => {
+        if (res.url().includes("api2.skool.com/courses") && res.request().method() === "POST") {
+          try {
+            const data = (await res.json()) as Record<string, unknown>;
+            if (data.root_id && data.id) {
+              clearTimeout(timeout);
+              resolve({
+                rootId: data.root_id as string,
+                pageId: data.id as string,
+              });
+            }
+          } catch { /* ignore */ }
+        }
+      });
+    });
+
+    // Trigger "Add page" to get root_id
+    const courseTopArea = page.locator('div[class*="CourseMenuTop"]').first();
+    await courseTopArea.hover();
+    await page.waitForTimeout(500);
+    await page.evaluate(() => {
+      const topArea = document.querySelector('div[class*="CourseMenuTop"]');
+      if (!topArea) return;
+      topArea.querySelectorAll("div, button, span, svg").forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        const text = el.textContent?.trim() || "";
+        if (rect.width > 10 && rect.width < 50 && rect.height > 10 && rect.height < 50 && text.length < 4) {
+          el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        }
+      });
+    });
+    await page.waitForTimeout(800);
+
+    try {
+      await page.getByText("Add page", { exact: true }).click({ timeout: 5000 });
+    } catch {
+      await page.getByText("Add page", { exact: true }).click({ force: true, timeout: 5000 });
+    }
+
+    const captured = await rootIdPromise;
+    rootId = captured.rootId;
+    tempPageId = captured.pageId;
+
+    // Delete the temporary "New page" that was created for discovery
+    if (tempPageId) {
+      await this.api.deletePage(tempPageId);
+    }
+
+    // Cache for future calls
+    this.cachedGroupId = groupId;
+    this.cachedUserId = userId;
+    this.cachedRootId = rootId;
+
+    return { groupId, userId, rootId };
+  }
+
+  // ----------------------------------------------------------
+  // Auth
+  // ----------------------------------------------------------
+
+  /** Login to Skool with email and password */
+  async login(email: string, password: string): Promise<OperationResult> {
+    const success = await this.ops.login(email, password);
+    return {
+      success,
+      message: success
+        ? "Logged in successfully. Session cached for future use."
+        : "Login failed. Check your email and password.",
+    };
+  }
+
+  /** Check if the current session is valid */
+  async checkSession(groupSlug: string): Promise<OperationResult> {
+    await this.ops.gotoCommunity(groupSlug);
+    const authenticated = await this.ops.isAuthenticated();
+    return {
+      success: authenticated,
+      message: authenticated
+        ? "Session is active."
+        : "Session expired. Run: skool login",
+    };
+  }
+
+  // ----------------------------------------------------------
+  // Classroom
+  // ----------------------------------------------------------
+
+  /** Create a new lesson in a Skool classroom module */
+  async createLesson(options: CreateLessonOptions): Promise<OperationResult> {
+    // Resolve HTML content
+    let html: string;
+
+    if (options.htmlContent) {
+      html = options.htmlContent;
+    } else if (options.markdownContent) {
+      html = markdownToHtml(options.markdownContent);
+    } else if (options.filePath) {
+      const content = readFileSync(options.filePath, "utf-8");
+
+      if (options.filePath.endsWith(".json")) {
+        const parsed = JSON.parse(content);
+        const sc = parsed.skool_class || parsed;
+        html = structuredContentToHtml(sc);
+      } else if (
+        options.filePath.endsWith(".html") ||
+        options.filePath.endsWith(".htm")
+      ) {
+        html = content;
+      } else {
+        html = markdownToHtml(content);
+      }
+    } else {
+      return {
+        success: false,
+        message: "No content provided. Use --file, --html, or provide markdown content.",
+      };
+    }
+
+    try {
+      // Discover IDs via browser navigation
+      const { groupId, userId, rootId } = await this.discoverIds(
+        options.group,
+        options.course
+      );
+
+      if (!groupId || !userId || !rootId) {
+        return {
+          success: false,
+          message: "Could not discover Skool IDs. Check your auth session.",
+        };
+      }
+
+      // Create lesson via direct API call
+      const result = await this.api.createPage({
+        groupId,
+        userId,
+        parentId: rootId, // TODO: support folder/module parentId
+        rootId,
+        title: options.title,
+        content: html,
+      });
+
+      return {
+        success: result.success,
+        message: result.message,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to create lesson: ${(error as Error).message}`,
+      };
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Community
+  // ----------------------------------------------------------
+
+  /** Create a community post */
+  async createPost(options: CreatePostOptions): Promise<OperationResult> {
+    // Check auth first
+    await this.ops.gotoCommunity(options.group);
+    const authenticated = await this.ops.isAuthenticated();
+    if (!authenticated) {
+      return {
+        success: false,
+        message: "Not authenticated. Run: skool login",
+      };
+    }
+
+    try {
+      await this.ops.createCommunityPost(
+        options.group,
+        options.title,
+        options.body,
+        options.category
+      );
+      return {
+        success: true,
+        message: `Post "${options.title}" created successfully.`,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to create post: ${(error as Error).message}`,
+      };
+    }
+  }
+
+  /** Get posts from a community */
+  async getPosts(
+    groupSlug: string
+  ): Promise<{ success: boolean; posts: SkoolPost[] }> {
+    try {
+      const raw = await this.ops.extractPosts(groupSlug);
+      const posts: SkoolPost[] = raw.map((p) => ({
+        title: p.title,
+        author: p.author,
+        category: p.category,
+        likes: 0,
+        comments: 0,
+        preview: p.preview,
+        url: p.url,
+      }));
+      return { success: true, posts };
+    } catch (error) {
+      return { success: false, posts: [] };
+    }
+  }
+
+  /** Get categories from a community */
+  async getCategories(
+    groupSlug: string
+  ): Promise<{ success: boolean; categories: string[] }> {
+    try {
+      const categories = await this.ops.extractCategories(groupSlug);
+      return { success: true, categories };
+    } catch {
+      return { success: false, categories: [] };
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Members
+  // ----------------------------------------------------------
+
+  /** Get members from a community */
+  async getMembers(
+    groupSlug: string,
+    search?: string
+  ): Promise<{ success: boolean; members: SkoolMember[] }> {
+    try {
+      const raw = await this.ops.extractMembers(groupSlug, search);
+      const members: SkoolMember[] = raw.map((m) => ({
+        name: m.name,
+        level: m.level,
+        points: 0,
+        contributions: m.contributions,
+      }));
+      return { success: true, members };
+    } catch {
+      return { success: false, members: [] };
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------
+
+  /** Close the browser and cleanup */
+  async close(): Promise<void> {
+    await this.browser.close();
+  }
+}
+
+// Re-export types for programmatic API users
+export type {
+  CreateLessonOptions,
+  CreatePostOptions,
+  OperationResult,
+  SkoolPost,
+  SkoolMember,
+} from "./types.js";

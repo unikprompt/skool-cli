@@ -1,0 +1,51 @@
+{
+  "name": "skool-cli",
+  "version": "1.0.0",
+  "description": "CLI and programmatic API for Skool.com automation — create lessons, posts, and manage communities via browser automation",
+  "type": "module",
+  "main": "dist/core/skool-client.js",
+  "types": "dist/core/skool-client.d.ts",
+  "bin": {
+    "skool": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/core/skool-client.js",
+      "types": "./dist/core/skool-client.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli.js"
+  },
+  "keywords": [
+    "skool",
+    "cli",
+    "automation",
+    "playwright",
+    "classroom",
+    "community",
+    "education",
+    "mcp",
+    "ai-tools"
+  ],
+  "author": "UNIKPROMPT Technologies LLC",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/unikprompt/skool-cli"
+  },
+  "homepage": "https://unikprompt.com",
+  "dependencies": {
+    "commander": "^13.1.0",
+    "playwright": "^1.52.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
