@@ -291,6 +291,68 @@ export class SkoolApi {
   }
 
   /**
+   * Create a folder (module) in a course.
+   */
+  async createFolder(options: {
+    groupId: string;
+    parentId: string;
+    rootId: string;
+    title: string;
+  }): Promise<{ success: boolean; folderId: string; message: string }> {
+    const result = await this.request("POST", "/courses", {
+      group_id: options.groupId,
+      parent_id: options.parentId,
+      root_id: options.rootId,
+      unit_type: "set",
+      state: 2,
+      metadata: { title: options.title },
+    });
+
+    if (result.status !== 200) {
+      return {
+        success: false,
+        folderId: "",
+        message: `Create folder failed (${result.status}): ${JSON.stringify(result.data)}`,
+      };
+    }
+
+    return {
+      success: true,
+      folderId: result.data.id as string,
+      message: `Folder "${options.title}" created. ID: ${result.data.id}`,
+    };
+  }
+
+  /**
+   * List all items (folders + pages) in a course.
+   */
+  async listCourseItems(
+    groupId: string,
+    rootId: string
+  ): Promise<Record<string, unknown>[]> {
+    // Try different endpoint patterns
+    for (const path of [
+      `/courses?group_id=${groupId}&root_id=${rootId}`,
+      `/courses?group_id=${groupId}`,
+      `/courses/${rootId}/children`,
+      `/courses/${rootId}`,
+    ]) {
+      const result = await this.request("GET", path);
+      if (result.status === 200) {
+        if (Array.isArray(result.data)) return result.data;
+        // Single course with children
+        if (result.data.children && Array.isArray(result.data.children))
+          return result.data.children as Record<string, unknown>[];
+        if (result.data.items && Array.isArray(result.data.items))
+          return result.data.items as Record<string, unknown>[];
+        // Single item response - could be the course itself
+        if (result.data.id) return [result.data];
+      }
+    }
+    return [];
+  }
+
+  /**
    * Delete a page by ID.
    */
   async deletePage(pageId: string): Promise<boolean> {

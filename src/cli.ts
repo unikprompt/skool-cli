@@ -12,6 +12,7 @@ import { debugCommand } from "./commands/debug.js";
 import { debugApiCommand } from "./commands/debug-api.js";
 import { testApiCommand } from "./commands/test-api.js";
 import { debugManualCommand } from "./commands/debug-manual.js";
+import { createFolderCommand } from "./commands/create-folder.js";
 
 const program = new Command();
 
@@ -28,6 +29,7 @@ program.addCommand(whoamiCommand);
 
 // Classroom commands
 program.addCommand(createLessonCommand);
+program.addCommand(createFolderCommand);
 
 // Community commands
 program.addCommand(createPostCommand);

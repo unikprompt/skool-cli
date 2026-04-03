@@ -7,6 +7,8 @@ export const createLessonCommand = new Command("create-lesson")
   .requiredOption("-m, --module <name>", "Module name (exact match)")
   .requiredOption("-t, --title <title>", "Lesson title (max 50 chars)")
   .option("--course <name>", "Course name (if multiple courses exist)")
+  .option("--folder <name>", "Folder/module name to create the lesson in")
+  .option("--folder-id <id>", "Folder ID directly (from create-folder output)")
   .option("-f, --file <path>", "Content file (.md, .html, or .json with skool_class)")
   .option("--html <path>", "HTML file to inject directly")
   .option("--markdown <text>", "Inline markdown content")
@@ -19,6 +21,8 @@ export const createLessonCommand = new Command("create-lesson")
         module: opts.module,
         title: opts.title,
         course: opts.course,
+        folder: opts.folder,
+        folderId: opts.folderId,
         filePath: opts.file || opts.html,
         markdownContent: opts.markdown,
       });

@@ -5,6 +5,7 @@ import { SkoolApi } from "./skool-api.js";
 import { markdownToHtml, structuredContentToHtml } from "./html-generator.js";
 import type {
   CreateLessonOptions,
+  CreateFolderOptions,
   CreatePostOptions,
   OperationResult,
   SkoolPost,
@@ -187,6 +188,52 @@ export class SkoolClient {
   // Classroom
   // ----------------------------------------------------------
 
+  /** Create a new folder (module) in a Skool classroom course */
+  async createFolder(options: CreateFolderOptions): Promise<OperationResult> {
+    try {
+      const { groupId, userId, rootId } = await this.discoverIds(
+        options.group,
+        options.course
+      );
+
+      if (!groupId || !rootId) {
+        return { success: false, message: "Could not discover Skool IDs." };
+      }
+
+      const result = await this.api.createFolder({
+        groupId,
+        parentId: rootId,
+        rootId,
+        title: options.title,
+      });
+
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to create folder: ${(error as Error).message}`,
+      };
+    }
+  }
+
+  /** Find a folder by name and return its ID */
+  private async findFolderByName(
+    groupId: string,
+    rootId: string,
+    folderName: string
+  ): Promise<string | null> {
+    const items = await this.api.listCourseItems(groupId, rootId);
+    for (const item of items) {
+      const meta = item.metadata as Record<string, unknown> | undefined;
+      const title = meta?.title as string || "";
+      const unitType = item.unit_type as string || "";
+      if (unitType === "set" && title.toLowerCase() === folderName.toLowerCase()) {
+        return item.id as string;
+      }
+    }
+    return null;
+  }
+
   /** Create a new lesson in a Skool classroom module */
   async createLesson(options: CreateLessonOptions): Promise<OperationResult> {
     // Resolve HTML content
@@ -232,11 +279,27 @@ export class SkoolClient {
         };
       }
 
+      // Resolve parent: if folder specified, find its ID
+      let parentId = rootId;
+      if (options.folderId) {
+        // Direct folder ID provided
+        parentId = options.folderId;
+      } else if (options.folder) {
+        const folderId = await this.findFolderByName(groupId, rootId, options.folder);
+        if (!folderId) {
+          return {
+            success: false,
+            message: `Folder "${options.folder}" not found. Try --folder-id with the folder ID directly.`,
+          };
+        }
+        parentId = folderId;
+      }
+
       // Create lesson via direct API call
       const result = await this.api.createPage({
         groupId,
         userId,
-        parentId: rootId, // TODO: support folder/module parentId
+        parentId,
         rootId,
         title: options.title,
         content: html,

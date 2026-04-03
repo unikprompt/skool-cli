@@ -35,9 +35,18 @@ export interface CreateLessonOptions {
   module: string;
   title: string;
   course?: string;
+  folder?: string;
+  folderId?: string;
   htmlContent?: string;
   markdownContent?: string;
   filePath?: string;
+}
+
+/** Options for creating a folder */
+export interface CreateFolderOptions {
+  group: string;
+  title: string;
+  course?: string;
 }
 
 /** Options for creating a post */
