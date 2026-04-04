@@ -1,0 +1,217 @@
+#!/usr/bin/env node
+/**
+ * skool-mcp-server — MCP Server for Skool.com
+ *
+ * Wraps skool-cli's SkoolClient as MCP tools for Claude Code, Cursor, etc.
+ */
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+import { SkoolClient } from "../core/skool-client.js";
+
+const client = new SkoolClient();
+
+const server = new McpServer({
+  name: "skool-mcp-server",
+  version: "1.0.0",
+});
+
+// ----------------------------------------------------------
+// Auth tools
+// ----------------------------------------------------------
+
+server.tool(
+  "skool_login",
+  "Login to Skool with email and password. Run this first.",
+  {
+    email: z.string().describe("Skool account email"),
+    password: z.string().describe("Skool account password"),
+  },
+  async ({ email, password }) => {
+    const result = await client.login(email, password);
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
+  "skool_check_session",
+  "Check if the current Skool session is active",
+  {
+    group: z.string().describe("Skool group slug (e.g. 'operadores-aumentados')"),
+  },
+  async ({ group }) => {
+    const result = await client.checkSession(group);
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+// ----------------------------------------------------------
+// Classroom tools
+// ----------------------------------------------------------
+
+server.tool(
+  "skool_create_lesson",
+  "Create a new lesson in a Skool classroom. Supports markdown, HTML, or JSON content.",
+  {
+    group: z.string().describe("Skool group slug"),
+    title: z.string().describe("Lesson title (max 50 chars)"),
+    markdown_content: z.string().optional().describe("Lesson content in markdown"),
+    html_content: z.string().optional().describe("Lesson content in HTML"),
+    course: z.string().optional().describe("Course name (if multiple courses)"),
+    folder: z.string().optional().describe("Folder/module name to create lesson in"),
+    folder_id: z.string().optional().describe("Folder ID directly"),
+  },
+  async (args) => {
+    const result = await client.createLesson({
+      group: args.group,
+      module: args.folder || "",
+      title: args.title,
+      course: args.course,
+      folder: args.folder,
+      folderId: args.folder_id,
+      markdownContent: args.markdown_content,
+      htmlContent: args.html_content,
+    });
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
+  "skool_create_folder",
+  "Create a new folder (module) in a Skool classroom course",
+  {
+    group: z.string().describe("Skool group slug"),
+    title: z.string().describe("Folder name (max 50 chars)"),
+    course: z.string().optional().describe("Course name"),
+  },
+  async (args) => {
+    const result = await client.createFolder({
+      group: args.group,
+      title: args.title,
+      course: args.course,
+    });
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
+  "skool_delete_lesson",
+  "Delete a lesson or folder by ID",
+  {
+    id: z.string().describe("Page or folder ID to delete"),
+  },
+  async ({ id }) => {
+    const result = await client.deleteLesson(id);
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
+  "skool_list_lessons",
+  "List all lessons and folders in a Skool classroom course",
+  {
+    group: z.string().describe("Skool group slug"),
+    course: z.string().optional().describe("Course name"),
+  },
+  async (args) => {
+    const result = await client.listLessons(args.group, args.course);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+// ----------------------------------------------------------
+// Community tools
+// ----------------------------------------------------------
+
+server.tool(
+  "skool_create_post",
+  "Create a new community post in Skool",
+  {
+    group: z.string().describe("Skool group slug"),
+    title: z.string().describe("Post title"),
+    body: z.string().describe("Post body text"),
+    category: z.string().optional().describe("Post category name"),
+  },
+  async (args) => {
+    const result = await client.createPost({
+      group: args.group,
+      title: args.title,
+      body: args.body,
+      category: args.category,
+    });
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
+  "skool_get_posts",
+  "List community posts from a Skool group",
+  {
+    group: z.string().describe("Skool group slug"),
+  },
+  async ({ group }) => {
+    const result = await client.getPosts(group);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  "skool_get_categories",
+  "List post categories in a Skool group",
+  {
+    group: z.string().describe("Skool group slug"),
+  },
+  async ({ group }) => {
+    const result = await client.getCategories(group);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  "skool_get_members",
+  "List or search members in a Skool group",
+  {
+    group: z.string().describe("Skool group slug"),
+    search: z.string().optional().describe("Search by name"),
+  },
+  async (args) => {
+    const result = await client.getMembers(args.group, args.search);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+// ----------------------------------------------------------
+// Start server
+// ----------------------------------------------------------
+
+async function main(): Promise<void> {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("[skool-mcp-server] Running");
+}
+
+main().catch((error) => {
+  console.error("[skool-mcp-server] Fatal:", error);
+  process.exit(1);
+});

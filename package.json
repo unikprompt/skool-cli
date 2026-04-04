@@ -6,7 +6,8 @@
   "main": "dist/core/skool-client.js",
   "types": "dist/core/skool-client.d.ts",
   "bin": {
-    "skool": "dist/cli.js"
+    "skool": "dist/cli.js",
+    "skool-mcp-server": "dist/mcp/server.js"
   },
   "exports": {
     ".": {
@@ -38,8 +39,10 @@
   },
   "homepage": "https://unikprompt.com",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^13.1.0",
-    "playwright": "^1.52.0"
+    "playwright": "^1.52.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
