@@ -430,14 +430,6 @@ export class SkoolApi {
       };
     }
 
-    // Fallback: extract from known values in the intercepted API calls
-    // We know from the debug-api output:
-    // group_id: 01fe75d52c50463fbe45d0a34bbcc398
-    // user_id: 84e41d162d6a46178e173fce440ea094
-    // root_id: fce518d5f6b84a18a4105fc5d353f660 (same as parent_id for top-level)
-    // But these are specific to Mario's account, so we need a dynamic way
-
-    // Try intercepting by navigating and capturing
     return null;
   }
 }
