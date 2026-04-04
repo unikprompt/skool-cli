@@ -6,3 +6,5 @@ tsconfig.json
 *.tsbuildinfo
 CLAUDE.md
 planning.md
+dist/commands/debug*
+dist/commands/test-api*
