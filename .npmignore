@@ -1,4 +1,5 @@
 src/
+skill/
 tsconfig.json
 .gitignore
 .env

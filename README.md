@@ -167,6 +167,41 @@ Headers (h1-h4), paragraphs, bold, italic, strikethrough, inline code, code bloc
 | Title too long | Automatically truncated to 50 characters |
 | Community posts look plain | Skool community posts only support plain text (no HTML) |
 
+## Use as Claude Code Skill
+
+For Claude Code users, the **skill** approach is lighter than MCP (no context overhead from tool schemas).
+
+Copy `skill/SKILL.md` to your project:
+
+```bash
+mkdir -p .claude/skills/skool-cli
+cp node_modules/skool-cli/skill/SKILL.md .claude/skills/skool-cli/SKILL.md
+```
+
+Or download from GitHub:
+
+```bash
+mkdir -p .claude/skills/skool-cli
+curl -o .claude/skills/skool-cli/SKILL.md https://raw.githubusercontent.com/unikprompt/skool-cli/main/skill/SKILL.md
+```
+
+Then tell Claude Code: "Create a lesson in Skool about X" and it will use the CLI commands automatically.
+
+## Use as MCP Server
+
+For Cursor, Windsurf, or other MCP clients, add to your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "skool": {
+      "command": "npx",
+      "args": ["-y", "skool-cli", "skool-mcp-server"]
+    }
+  }
+}
+```
+
 ## Learn More
 
 - [TikTok @unikprompt](https://tiktok.com/@unikprompt) - Automation tutorials
