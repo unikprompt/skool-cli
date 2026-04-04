@@ -447,8 +447,7 @@ export class PageOps {
     // Verify edit mode (SAVE button visible)
     const inEditMode = (await page.locator('button:has-text("SAVE")').count()) > 0;
     if (!inEditMode) {
-      await page.screenshot({ path: "/tmp/skool-debug-no-edit-mode.png" });
-      throw new Error("Could not enter edit mode. Check /tmp/skool-debug-no-edit-mode.png");
+      throw new Error("Could not enter edit mode. Try running with SKOOL_CLI_HEADLESS=false to debug.");
     }
 
     // Step 4: Fill title + inject content

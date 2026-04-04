@@ -89,14 +89,14 @@ function parseInline(html: string): Record<string, unknown>[] {
 
   while ((match = inlineRegex.exec(html)) !== null) {
     if (match[4]) {
-      // Plain text (no tag)
-      const text = decodeEntities(match[4].trim());
+      // Plain text (no tag) — preserve spaces for inline continuity
+      const text = decodeEntities(match[4]);
       if (text) nodes.push({ type: "text", text });
     } else {
       const tag = match[1].toLowerCase();
       const attrs = match[2] || "";
-      const inner = decodeEntities(stripTags(match[3]).trim());
-      if (!inner) continue;
+      const inner = decodeEntities(stripTags(match[3]));
+      if (!inner.trim()) continue;
 
       const marks: Record<string, unknown>[] = [];
       if (tag === "strong" || tag === "b") marks.push({ type: "bold" });

@@ -216,22 +216,81 @@ export class SkoolClient {
     }
   }
 
-  /** Find a folder by name and return its ID */
+  /** Find a folder by name and return its ID.
+   * Extracts folder names + IDs from the sidebar DOM via Playwright.
+   */
   private async findFolderByName(
     groupId: string,
     rootId: string,
     folderName: string
   ): Promise<string | null> {
+    // First try: API-based lookup
     const items = await this.api.listCourseItems(groupId, rootId);
     for (const item of items) {
       const meta = item.metadata as Record<string, unknown> | undefined;
-      const title = meta?.title as string || "";
-      const unitType = item.unit_type as string || "";
-      if (unitType === "set" && title.toLowerCase() === folderName.toLowerCase()) {
+      const title = (meta?.title as string) || "";
+      const unitType = (item.unit_type as string) || "";
+      if (
+        unitType === "set" &&
+        title.toLowerCase() === folderName.toLowerCase()
+      ) {
         return item.id as string;
       }
     }
-    return null;
+
+    // Second try: extract from sidebar links via Playwright
+    // Folder links in the sidebar contain the folder ID in the URL hash
+    const page = await this.browser.getPage();
+    const folderId = await page.evaluate((name: string) => {
+      // Folders in sidebar are MenuItemTitle elements
+      // Their parent MenuItemWrapper contains a link or data attribute with the ID
+      // When you click a folder, the URL changes to include ?md=<folder_first_child_id>
+      // But we can also find the folder by matching the name in the sidebar
+      // and looking for nearby elements with ID-like attributes
+
+      // Alternative: look at all links in the sidebar that contain the course path
+      const links = document.querySelectorAll('a[href*="/classroom/"]');
+      let found = "";
+      links.forEach((link) => {
+        const href = link.getAttribute("href") || "";
+        const text = link.textContent?.trim() || "";
+        // Links inside folders have ?md= parameter with the page ID
+        // We need the folder ID, which is the parent_id of pages inside it
+        // This approach won't give us the folder ID directly
+      });
+
+      // Better approach: check if Skool stores course data in React state
+      // Look for __NEXT_DATA__ or similar
+      const scripts = document.querySelectorAll("script#__NEXT_DATA__");
+      if (scripts.length > 0) {
+        try {
+          const data = JSON.parse(scripts[0].textContent || "{}");
+          const str = JSON.stringify(data);
+          // Find all "set" type items (folders) by parsing the full state
+          // Pattern: "unit_type":"set" with matching "title":"<name>"
+          const regex = new RegExp(
+            `"id":"([a-f0-9]{32})"[^}]*"unit_type":"set"[^}]*"title":"${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`,
+            "i"
+          );
+          const match = str.match(regex);
+          if (match) return match[1];
+
+          // Try reverse order (title before id)
+          const regex2 = new RegExp(
+            `"title":"${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^}]*"unit_type":"set"[^}]*"id":"([a-f0-9]{32})"`,
+            "i"
+          );
+          const match2 = str.match(regex2);
+          if (match2) return match2[1];
+        } catch {
+          // ignore parse errors
+        }
+      }
+
+      return found;
+    }, folderName);
+
+    return folderId || null;
   }
 
   /** Create a new lesson in a Skool classroom module */
@@ -313,6 +372,135 @@ export class SkoolClient {
       return {
         success: false,
         message: `Failed to create lesson: ${(error as Error).message}`,
+      };
+    }
+  }
+
+  /** List all lessons and folders in a course (from sidebar DOM) */
+  async listLessons(
+    groupSlug: string,
+    courseName?: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    items: Array<{
+      name: string;
+      type: "folder" | "lesson";
+      children?: Array<{ name: string }>;
+    }>;
+  }> {
+    try {
+      const page = await this.browser.getPage();
+
+      // Navigate to classroom and enter course
+      await this.ops.gotoClassroom(groupSlug);
+      if (courseName) {
+        await page.getByText(courseName, { exact: false }).first().click();
+      } else {
+        const link = page.locator('a[href*="/classroom/"]').first();
+        if ((await link.count()) > 0) await link.click();
+      }
+      await page.waitForTimeout(3000);
+
+      // Extract structure from sidebar DOM
+      // Folders have class MenuItemTitle with a chevron (expandable)
+      // Lessons are links inside expanded folders or at course root
+      const items = await page.evaluate(() => {
+        const result: Array<{
+          name: string;
+          type: "folder" | "lesson";
+          children?: Array<{ name: string }>;
+        }> = [];
+
+        // All items in the sidebar menu
+        const wrappers = document.querySelectorAll(
+          'div[class*="MenuItemWrapper"]'
+        );
+
+        let currentFolder: {
+          name: string;
+          type: "folder";
+          children: Array<{ name: string }>;
+        } | null = null;
+
+        wrappers.forEach((wrapper) => {
+          const titleEl = wrapper.querySelector(
+            'div[class*="MenuItemTitle"]'
+          );
+          const name = titleEl?.textContent?.trim() || "";
+          if (!name) return;
+
+          // Check if this is a folder (has SetMenuItem children or is a "set" type)
+          // Folders have a chevron (expand/collapse) indicator
+          const hasChevron =
+            wrapper.querySelector('svg, [class*="Chevron"], [class*="arrow"]') !== null;
+          const setItems = wrapper.querySelector(
+            'div[class*="SetMenuItem"]'
+          );
+
+          // A folder is an item that contains other items
+          // In the DOM: folders are top-level MenuItemWrapper with child SetMenuItem items
+          if (setItems || wrapper.classList.toString().includes("SetMenuItem") === false) {
+            // Check if this item has children (is expanded with lessons underneath)
+            const childContainer = wrapper.querySelector(
+              'div[class*="SetMenuItem"]'
+            );
+            if (childContainer) {
+              // This is a folder with visible children
+              currentFolder = { name, type: "folder", children: [] };
+              // Children are links inside this wrapper
+              const childLinks = wrapper.querySelectorAll(
+                'a[href*="/classroom/"]'
+              );
+              childLinks.forEach((link) => {
+                const childName = link.textContent?.trim() || "";
+                if (childName && childName !== name) {
+                  currentFolder!.children.push({ name: childName });
+                }
+              });
+              result.push(currentFolder);
+              currentFolder = null;
+            } else {
+              // Standalone item (could be a collapsed folder or a root-level lesson)
+              // Check if it has a link (lessons have links, folders don't always)
+              const link = wrapper.querySelector('a[href*="/classroom/"]');
+              if (link) {
+                result.push({ name, type: "lesson" });
+              } else {
+                // Collapsed folder (no children visible)
+                result.push({ name, type: "folder", children: [] });
+              }
+            }
+          }
+        });
+
+        return result;
+      });
+
+      return { success: true, message: `Found ${items.length} items`, items };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to list lessons: ${(error as Error).message}`,
+        items: [],
+      };
+    }
+  }
+
+  /** Delete a lesson or folder by ID */
+  async deleteLesson(pageId: string): Promise<OperationResult> {
+    try {
+      const success = await this.api.deletePage(pageId);
+      return {
+        success,
+        message: success
+          ? `Deleted successfully. ID: ${pageId}`
+          : `Delete failed for ID: ${pageId}`,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to delete: ${(error as Error).message}`,
       };
     }
   }
