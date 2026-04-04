@@ -204,8 +204,8 @@ For Cursor, Windsurf, or other MCP clients, add to your MCP config:
 
 ## Learn More
 
-- [TikTok @unikprompt](https://tiktok.com/@unikprompt) - Automation tutorials
-- [Facebook: Claude Code en Espanol](https://facebook.com/groups/claudecodeenespanol) - Free community
+- [LinkedIn](https://www.linkedin.com/in/mario-perez-ed) - Mario Perez Edwards
+- [X @mperedwa](https://x.com/mperedwa) - Updates and builds
 - [Skool: Operadores Aumentados](https://skool.com/operadores-aumentados) - Premium community
 - [UNIKPROMPT](https://unikprompt.com) - More tools and resources
 
