@@ -3,3 +3,4 @@ dist/
 *.tsbuildinfo
 .env
 CLAUDE.md
+planning.md
