@@ -26,6 +26,7 @@ export class SkoolClient {
   private cachedGroupId = "";
   private cachedUserId = "";
   private cachedRootId = "";
+  private lastGroupSlug = "";
 
   constructor() {
     this.browser = new BrowserManager();
@@ -154,6 +155,7 @@ export class SkoolClient {
     this.cachedGroupId = groupId;
     this.cachedUserId = userId;
     this.cachedRootId = rootId;
+    this.lastGroupSlug = groupSlug;
 
     return { groupId, userId, rootId };
   }
@@ -218,78 +220,49 @@ export class SkoolClient {
   }
 
   /** Find a folder by name and return its ID.
-   * Extracts folder names + IDs from the sidebar DOM via Playwright.
+   * Navigates to the course page and extracts folder data from __NEXT_DATA__.
    */
   private async findFolderByName(
     groupId: string,
     rootId: string,
     folderName: string
   ): Promise<string | null> {
-    // First try: API-based lookup
-    const items = await this.api.listCourseItems(groupId, rootId);
-    for (const item of items) {
-      const meta = item.metadata as Record<string, unknown> | undefined;
-      const title = (meta?.title as string) || "";
-      const unitType = (item.unit_type as string) || "";
-      if (
-        unitType === "set" &&
-        title.toLowerCase() === folderName.toLowerCase()
-      ) {
-        return item.id as string;
-      }
-    }
-
-    // Second try: extract from sidebar links via Playwright
-    // Folder links in the sidebar contain the folder ID in the URL hash
     const page = await this.browser.getPage();
-    const folderId = await page.evaluate((name: string) => {
-      // Folders in sidebar are MenuItemTitle elements
-      // Their parent MenuItemWrapper contains a link or data attribute with the ID
-      // When you click a folder, the URL changes to include ?md=<folder_first_child_id>
-      // But we can also find the folder by matching the name in the sidebar
-      // and looking for nearby elements with ID-like attributes
 
-      // Alternative: look at all links in the sidebar that contain the course path
-      const links = document.querySelectorAll('a[href*="/classroom/"]');
-      let found = "";
-      links.forEach((link) => {
-        const href = link.getAttribute("href") || "";
-        const text = link.textContent?.trim() || "";
-        // Links inside folders have ?md= parameter with the page ID
-        // We need the folder ID, which is the parent_id of pages inside it
-        // This approach won't give us the folder ID directly
-      });
+    // Navigate directly to the course page to get fresh __NEXT_DATA__
+    const courseUrl = `https://www.skool.com/${this.lastGroupSlug || "x"}/classroom/${rootId}`;
+    await page.goto(courseUrl);
+    await page.waitForTimeout(3000);
 
-      // Better approach: check if Skool stores course data in React state
-      // Look for __NEXT_DATA__ or similar
-      const scripts = document.querySelectorAll("script#__NEXT_DATA__");
-      if (scripts.length > 0) {
+    const folderId = await page.evaluate(
+      ({ name }) => {
+        const script = document.querySelector("script#__NEXT_DATA__");
+        if (!script) return "";
+
         try {
-          const data = JSON.parse(scripts[0].textContent || "{}");
-          const str = JSON.stringify(data);
-          // Find all "set" type items (folders) by parsing the full state
-          // Pattern: "unit_type":"set" with matching "title":"<name>"
-          const regex = new RegExp(
-            `"id":"([a-f0-9]{32})"[^}]*"unit_type":"set"[^}]*"title":"${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`,
-            "i"
-          );
-          const match = str.match(regex);
-          if (match) return match[1];
+          const data = JSON.parse(script.textContent || "{}");
+          const course = data?.props?.pageProps?.course;
+          if (!course?.children) return "";
 
-          // Try reverse order (title before id)
-          const regex2 = new RegExp(
-            `"title":"${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^}]*"unit_type":"set"[^}]*"id":"([a-f0-9]{32})"`,
-            "i"
-          );
-          const match2 = str.match(regex2);
-          if (match2) return match2[1];
+          // Walk the children tree looking for folders (unitType: "set")
+          for (const child of course.children) {
+            const c = child.course || child;
+            const title = c.metadata?.title || c.name || "";
+            const unitType = c.unitType || c.unit_type || "";
+            if (
+              unitType === "set" &&
+              title.toLowerCase() === name.toLowerCase()
+            ) {
+              return c.id;
+            }
+          }
         } catch {
           // ignore parse errors
         }
-      }
-
-      return found;
-    }, folderName);
+        return "";
+      },
+      { name: folderName }
+    );
 
     return folderId || null;
   }
