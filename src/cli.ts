@@ -3,6 +3,7 @@
 import { Command } from "commander";
 import { loginCommand } from "./commands/login.js";
 import { whoamiCommand } from "./commands/whoami.js";
+import { createCourseCommand } from "./commands/create-course.js";
 import { createLessonCommand } from "./commands/create-lesson.js";
 import { createFolderCommand } from "./commands/create-folder.js";
 import { createPostCommand } from "./commands/create-post.js";
@@ -28,6 +29,7 @@ program.addCommand(loginCommand);
 program.addCommand(whoamiCommand);
 
 // Classroom
+program.addCommand(createCourseCommand);
 program.addCommand(createLessonCommand);
 program.addCommand(createFolderCommand);
 program.addCommand(editLessonCommand);

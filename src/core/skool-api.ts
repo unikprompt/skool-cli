@@ -239,6 +239,48 @@ export class SkoolApi {
   }
 
   /**
+   * Create a new course in a group.
+   */
+  async createCourse(options: {
+    groupId: string;
+    userId: string;
+    title: string;
+    description?: string;
+    privacy?: number;
+  }): Promise<{ success: boolean; courseId: string; message: string }> {
+    const { groupId, userId, title, description, privacy } = options;
+
+    const result = await this.request("POST", "/courses", {
+      group_id: groupId,
+      user_id: userId,
+      unit_type: "course",
+      state: 2,
+      is_afl_comp_eligible: false,
+      metadata: {
+        title,
+        desc: description || "",
+        privacy: privacy ?? 0,
+        min_tier: 0,
+      },
+    });
+
+    if (result.status !== 200) {
+      return {
+        success: false,
+        courseId: "",
+        message: `Create course failed with status ${result.status}: ${JSON.stringify(result.data)}`,
+      };
+    }
+
+    const courseId = result.data.id as string;
+    return {
+      success: true,
+      courseId,
+      message: `Course "${title}" created successfully. ID: ${courseId}`,
+    };
+  }
+
+  /**
    * Create a new page (lesson) in a course.
    *
    * @param groupId - Group ID (from the classroom URL or course data)

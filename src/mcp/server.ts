@@ -55,6 +55,28 @@ server.tool(
 // ----------------------------------------------------------
 
 server.tool(
+  "skool_create_course",
+  "Create a new course in a Skool group",
+  {
+    group: z.string().describe("Skool group slug"),
+    title: z.string().describe("Course title (max 50 chars)"),
+    description: z.string().optional().describe("Course description (max 500 chars)"),
+    privacy: z.enum(["open", "level", "buy", "time", "private"]).optional().describe("Access type (default: open)"),
+  },
+  async (args) => {
+    const result = await client.createCourse({
+      group: args.group,
+      title: args.title,
+      description: args.description,
+      privacy: args.privacy,
+    });
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
   "skool_create_lesson",
   "Create a new lesson in a Skool classroom. Supports markdown, HTML, or JSON content.",
   {

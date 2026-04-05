@@ -4,6 +4,7 @@ import { PageOps } from "./page-ops.js";
 import { SkoolApi } from "./skool-api.js";
 import { markdownToHtml, structuredContentToHtml } from "./html-generator.js";
 import type {
+  CreateCourseOptions,
   CreateLessonOptions,
   EditLessonOptions,
   CreateFolderOptions,
@@ -190,6 +191,80 @@ export class SkoolClient {
   // ----------------------------------------------------------
   // Classroom
   // ----------------------------------------------------------
+
+  /** Discover groupId and userId without entering a course */
+  private async discoverGroupIds(
+    groupSlug: string
+  ): Promise<{ groupId: string; userId: string }> {
+    if (this.cachedGroupId && this.cachedUserId) {
+      return { groupId: this.cachedGroupId, userId: this.cachedUserId };
+    }
+
+    const page = await this.browser.getPage();
+    await this.ops.gotoClassroom(groupSlug);
+    await page.waitForTimeout(2000);
+
+    // Get group_id from page assets
+    const groupId = await page.evaluate(() => {
+      const ogMatch = document.documentElement.innerHTML.match(
+        /assets\.skool\.com\/f\/([a-f0-9]{32})/
+      );
+      return ogMatch ? ogMatch[1] : "";
+    });
+
+    // Get user_id from JWT auth_token cookie
+    let userId = "";
+    const cookies = await page.context().cookies();
+    const authCookie = cookies.find((c) => c.name === "auth_token");
+    if (authCookie) {
+      try {
+        const payload = JSON.parse(
+          Buffer.from(authCookie.value.split(".")[1], "base64").toString()
+        );
+        userId = payload.user_id || payload.sub || payload.id || "";
+      } catch { /* ignore */ }
+    }
+
+    this.cachedGroupId = groupId;
+    this.cachedUserId = userId;
+    this.lastGroupSlug = groupSlug;
+
+    return { groupId, userId };
+  }
+
+  /** Create a new course in a Skool group */
+  async createCourse(options: CreateCourseOptions): Promise<OperationResult> {
+    const privacyMap: Record<string, number> = {
+      open: 0,
+      level: 1,
+      buy: 2,
+      time: 3,
+      private: 4,
+    };
+
+    try {
+      const { groupId, userId } = await this.discoverGroupIds(options.group);
+
+      if (!groupId || !userId) {
+        return { success: false, message: "Could not discover Skool IDs." };
+      }
+
+      const result = await this.api.createCourse({
+        groupId,
+        userId,
+        title: options.title,
+        description: options.description,
+        privacy: privacyMap[options.privacy || "open"] ?? 0,
+      });
+
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to create course: ${(error as Error).message}`,
+      };
+    }
+  }
 
   /** Create a new folder (module) in a Skool classroom course */
   async createFolder(options: CreateFolderOptions): Promise<OperationResult> {

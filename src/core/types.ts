@@ -61,6 +61,14 @@ export interface EditLessonOptions {
   resources?: LessonResource[];
 }
 
+/** Options for creating a course */
+export interface CreateCourseOptions {
+  group: string;
+  title: string;
+  description?: string;
+  privacy?: "open" | "level" | "buy" | "time" | "private";
+}
+
 /** Options for creating a folder */
 export interface CreateFolderOptions {
   group: string;

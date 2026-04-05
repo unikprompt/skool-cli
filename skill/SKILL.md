@@ -65,6 +65,17 @@ npx skool-cli list-lessons -g GROUP --course "COURSE"
 npx skool-cli list-lessons -g GROUP --json
 ```
 
+### Classroom - Courses
+
+```bash
+# Create a new course
+npx skool-cli create-course -g GROUP -t "Course Name" -d "Course description"
+
+# Create course with specific privacy
+npx skool-cli create-course -g GROUP -t "Premium Course" -d "Description" --privacy level
+# Privacy options: open (default), level, buy, time, private
+```
+
 ### Classroom - Folders (Modules)
 
 ```bash
