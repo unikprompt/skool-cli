@@ -266,6 +266,53 @@ export class SkoolClient {
     }
   }
 
+  /** List all courses in a group */
+  async listCourses(groupSlug: string): Promise<{
+    success: boolean;
+    message: string;
+    courses: { id: string; title: string; description: string; privacy: number }[];
+  }> {
+    try {
+      const page = await this.browser.getPage();
+      await page.goto(`https://www.skool.com/${groupSlug}/classroom`);
+      await page.waitForTimeout(3000);
+
+      const courses = await page.evaluate(() => {
+        const script = document.querySelector("script#__NEXT_DATA__");
+        if (!script) return [];
+        const data = JSON.parse(script.textContent || "{}");
+        const allCourses = data?.props?.pageProps?.allCourses;
+        if (!Array.isArray(allCourses)) return [];
+        return allCourses.map((c: Record<string, unknown>) => {
+          const meta = c.metadata as Record<string, unknown> || {};
+          return {
+            id: c.id as string,
+            title: (meta.title as string) || "",
+            description: (meta.desc as string) || "",
+            privacy: (meta.privacy as number) || 0,
+          };
+        });
+      });
+
+      return {
+        success: true,
+        message: `Found ${courses.length} course(s)`,
+        courses,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to list courses: ${(error as Error).message}`,
+        courses: [],
+      };
+    }
+  }
+
+  /** Delete a course by ID */
+  async deleteCourse(courseId: string): Promise<OperationResult> {
+    return this.deleteLesson(courseId);
+  }
+
   /** Create a new folder (module) in a Skool classroom course */
   async createFolder(options: CreateFolderOptions): Promise<OperationResult> {
     try {

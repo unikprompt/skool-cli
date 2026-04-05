@@ -77,6 +77,34 @@ server.tool(
 );
 
 server.tool(
+  "skool_list_courses",
+  "List all courses in a Skool group",
+  {
+    group: z.string().describe("Skool group slug"),
+  },
+  async ({ group }) => {
+    const result = await client.listCourses(group);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  "skool_delete_course",
+  "Delete a course by ID",
+  {
+    id: z.string().describe("Course ID to delete"),
+  },
+  async ({ id }) => {
+    const result = await client.deleteCourse(id);
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
   "skool_create_lesson",
   "Create a new lesson in a Skool classroom. Supports markdown, HTML, or JSON content.",
   {

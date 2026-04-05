@@ -4,6 +4,8 @@ import { Command } from "commander";
 import { loginCommand } from "./commands/login.js";
 import { whoamiCommand } from "./commands/whoami.js";
 import { createCourseCommand } from "./commands/create-course.js";
+import { listCoursesCommand } from "./commands/list-courses.js";
+import { deleteCourseCommand } from "./commands/delete-course.js";
 import { createLessonCommand } from "./commands/create-lesson.js";
 import { createFolderCommand } from "./commands/create-folder.js";
 import { createPostCommand } from "./commands/create-post.js";
@@ -30,6 +32,8 @@ program.addCommand(whoamiCommand);
 
 // Classroom
 program.addCommand(createCourseCommand);
+program.addCommand(listCoursesCommand);
+program.addCommand(deleteCourseCommand);
 program.addCommand(createLessonCommand);
 program.addCommand(createFolderCommand);
 program.addCommand(editLessonCommand);
