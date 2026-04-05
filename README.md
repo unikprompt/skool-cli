@@ -121,6 +121,7 @@ skool get-profile --json
 # Edit profile fields
 skool edit-profile --bio "New bio" --location "Fort Myers, FL"
 skool edit-profile --website "https://example.com" --twitter "https://x.com/user"
+skool edit-profile --photo ./my-photo.jpg
 
 # List your communities
 skool list-communities

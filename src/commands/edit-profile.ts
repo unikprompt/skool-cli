@@ -11,6 +11,7 @@ export const editProfileCommand = new Command("edit-profile")
   .option("--linkedin <url>", "LinkedIn URL")
   .option("--facebook <url>", "Facebook URL")
   .option("--youtube <url>", "YouTube URL")
+  .option("--photo <path>", "Profile photo (local image file)")
   .action(async (opts) => {
     const client = new SkoolClient();
     try {
@@ -23,6 +24,7 @@ export const editProfileCommand = new Command("edit-profile")
         linkedin: opts.linkedin,
         facebook: opts.facebook,
         youtube: opts.youtube,
+        photo: opts.photo,
       });
       console.log(result.success ? `OK: ${result.message}` : `FAIL: ${result.message}`);
       process.exit(result.success ? 0 : 1);

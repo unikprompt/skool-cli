@@ -11,10 +11,17 @@ export interface SkoolPost {
 
 /** Skool community member */
 export interface SkoolMember {
+  id: string;
   name: string;
+  firstName: string;
+  lastName: string;
+  bio: string;
   level: number;
   points: number;
   contributions: number;
+  role: string;
+  joinedAt: string;
+  photoUrl: string;
 }
 
 /** Skool course info */
@@ -130,6 +137,7 @@ export interface EditProfileOptions {
   linkedin?: string;
   facebook?: string;
   youtube?: string;
+  photo?: string;
 }
 
 /** A notification from Skool */

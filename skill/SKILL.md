@@ -205,6 +205,7 @@ npx skool-cli get-profile --json
 npx skool-cli edit-profile --bio "New bio text"
 npx skool-cli edit-profile --location "Fort Myers, FL" --website "https://example.com"
 npx skool-cli edit-profile --twitter "https://x.com/user" --linkedin "https://linkedin.com/in/user"
+npx skool-cli edit-profile --photo ./my-photo.jpg
 
 # List your communities
 npx skool-cli list-communities

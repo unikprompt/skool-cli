@@ -22,9 +22,12 @@ export const getMembersCommand = new Command("get-members")
         if (result.members.length === 0) {
           console.log(opts.search ? `No members found matching "${opts.search}".` : "No members found.");
         } else {
-          console.log(`Members${opts.search ? ` matching "${opts.search}"` : ""}:\n`);
-          for (const [i, m] of result.members.entries()) {
-            console.log(`${i + 1}. ${m.name} (Level ${m.level})`);
+          console.log(`${result.members.length} member(s)${opts.search ? ` matching "${opts.search}"` : ""}:\n`);
+          for (const m of result.members) {
+            console.log(`  ${m.firstName} ${m.lastName} (@${m.name})`);
+            console.log(`  Level ${m.level} | ${m.points} pts | ${m.role}`);
+            if (m.bio) console.log(`  ${m.bio.slice(0, 60)}`);
+            console.log();
           }
         }
       }

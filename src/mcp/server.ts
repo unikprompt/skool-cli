@@ -565,6 +565,7 @@ server.tool(
     linkedin: z.string().optional().describe("LinkedIn URL"),
     facebook: z.string().optional().describe("Facebook URL"),
     youtube: z.string().optional().describe("YouTube URL"),
+    photo: z.string().optional().describe("Path to local profile photo image file"),
   },
   async (args) => {
     const result = await client.editProfile({
@@ -576,6 +577,7 @@ server.tool(
       linkedin: args.linkedin,
       facebook: args.facebook,
       youtube: args.youtube,
+      photo: args.photo,
     });
     return {
       content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],

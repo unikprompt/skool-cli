@@ -1247,13 +1247,43 @@ export class SkoolClient {
     search?: string
   ): Promise<{ success: boolean; members: SkoolMember[] }> {
     try {
-      const raw = await this.ops.extractMembers(groupSlug, search);
-      const members: SkoolMember[] = raw.map((m) => ({
-        name: m.name,
-        level: m.level,
-        points: 0,
-        contributions: m.contributions,
+      const page = await this.browser.getPage();
+      const url = search
+        ? `https://www.skool.com/${groupSlug}/-/members?q=${encodeURIComponent(search)}`
+        : `https://www.skool.com/${groupSlug}/-/members`;
+      await page.goto(url, { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(4000);
+
+      const rawMembers = await page.evaluate(() => {
+        const script = document.querySelector("script#__NEXT_DATA__");
+        if (!script) return [];
+        const d = JSON.parse(script.textContent || "{}");
+        const users = d?.props?.pageProps?.users || [];
+        return (users as Array<Record<string, unknown>>).map((u) => {
+          const meta = (u.metadata || {}) as Record<string, string>;
+          const member = (u.member || {}) as Record<string, string>;
+          let spData = { pts: 0, lv: 1 };
+          try { spData = JSON.parse(meta.spData || "{}"); } catch { /* ignore */ }
+          return {
+            id: String(u.id || ""),
+            name: String(u.name || ""),
+            firstName: String(u.firstName || ""),
+            lastName: String(u.lastName || ""),
+            bio: String(meta.bio || ""),
+            level: Number((spData as Record<string, number>).lv || 1),
+            points: Number((spData as Record<string, number>).pts || 0),
+            role: String(member.role || "member"),
+            joinedAt: String(member.createdAt || ""),
+            photoUrl: String(meta.pictureProfile || ""),
+          };
+        });
+      });
+
+      const members: SkoolMember[] = rawMembers.map((m) => ({
+        ...m,
+        contributions: 0,
       }));
+
       return { success: true, members };
     } catch {
       return { success: false, members: [] };
@@ -1377,6 +1407,22 @@ export class SkoolClient {
       };
 
       const updates: string[] = [];
+
+      // Handle photo upload first
+      if (options.photo) {
+        const uploaded = await this.api.uploadFile(options.photo, userId);
+        if (!uploaded) {
+          return { success: false, message: "Failed to upload photo" };
+        }
+        // Update both profile and bubble photos
+        const profileResult = await this.api.updateProfileField(userId, "picture_profile", uploaded.readUrl);
+        if (!profileResult.success) return profileResult;
+        const bubbleResult = await this.api.updateProfileField(userId, "picture_bubble", uploaded.readUrl);
+        if (!bubbleResult.success) return bubbleResult;
+        updates.push("photo");
+      }
+
+      // Handle text fields
       for (const [optKey, apiField] of Object.entries(fieldMap)) {
         const value = options[optKey as keyof EditProfileOptions];
         if (value !== undefined) {
