@@ -94,6 +94,20 @@ function textToHtml(text: string): string {
         continue;
       }
 
+      // Blockquote: > text (can span multiple lines)
+      if (/^>\s?/.test(line)) {
+        let quoteContent = "";
+        while (i < lines.length && /^>\s?/.test(lines[i].trim())) {
+          const quoteText = lines[i].trim().replace(/^>\s?/, "");
+          quoteContent += (quoteContent ? " " : "") + quoteText;
+          i++;
+        }
+        if (quoteContent) {
+          html += `<blockquote><p>${applyInlineFormatting(quoteContent)}</p></blockquote>`;
+        }
+        continue;
+      }
+
       // Bullet list
       if (/^[-\u2022]\s/.test(line)) {
         html += "<ul>";
