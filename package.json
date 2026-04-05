@@ -1,6 +1,6 @@
 {
   "name": "skool-cli",
-  "version": "1.9.2",
+  "version": "1.10.0",
   "description": "CLI and programmatic API for Skool.com automation — create lessons, posts, and manage communities via browser automation",
   "type": "module",
   "main": "dist/core/skool-client.js",
