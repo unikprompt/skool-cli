@@ -281,6 +281,27 @@ export class SkoolApi {
   }
 
   /**
+   * Update a course's metadata (title, description, privacy).
+   */
+  async updateCourse(
+    courseId: string,
+    metadata: Record<string, unknown>
+  ): Promise<{ success: boolean; message: string }> {
+    const result = await this.request("PUT", `/courses/${courseId}`, {
+      metadata,
+    });
+
+    if (result.status !== 200) {
+      return {
+        success: false,
+        message: `Update failed with status ${result.status}: ${JSON.stringify(result.data)}`,
+      };
+    }
+
+    return { success: true, message: `Course ${courseId} updated successfully` };
+  }
+
+  /**
    * Create a new page (lesson) in a course.
    *
    * @param groupId - Group ID (from the classroom URL or course data)

@@ -308,6 +308,35 @@ export class SkoolClient {
     }
   }
 
+  /** Edit a course's title, description, or privacy */
+  async editCourse(options: {
+    id: string;
+    title?: string;
+    description?: string;
+    privacy?: "open" | "level" | "buy" | "time" | "private";
+  }): Promise<OperationResult> {
+    const privacyMap: Record<string, number> = {
+      open: 0, level: 1, buy: 2, time: 3, private: 4,
+    };
+
+    if (!options.title && !options.description && !options.privacy) {
+      return { success: false, message: "Nothing to update. Provide --title, --description, or --privacy." };
+    }
+
+    try {
+      const body: Record<string, unknown> = {};
+      if (options.title) body.title = options.title;
+      if (options.description !== undefined) body.desc = options.description;
+      if (options.privacy) body.privacy = privacyMap[options.privacy] ?? 0;
+
+      // Wrap in metadata for course updates
+      const result = await this.api.updateCourse(options.id, body);
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      return { success: false, message: `Failed to edit course: ${(error as Error).message}` };
+    }
+  }
+
   /** Delete a course by ID */
   async deleteCourse(courseId: string): Promise<OperationResult> {
     return this.deleteLesson(courseId);

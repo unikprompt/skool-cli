@@ -75,7 +75,11 @@ npx skool-cli create-course -g GROUP -t "Course Name" -d "Course description"
 npx skool-cli create-course -g GROUP -t "Premium Course" -d "Description" --privacy level
 # Privacy options: open (default), level, buy, time, private
 
-# List all courses
+# Edit a course
+npx skool-cli edit-course --id COURSE_ID --title "New Name" --description "New desc"
+npx skool-cli edit-course --id COURSE_ID --privacy private
+
+# List all courses (to get IDs)
 npx skool-cli list-courses -g GROUP
 npx skool-cli list-courses -g GROUP --json
 

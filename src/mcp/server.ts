@@ -91,6 +91,28 @@ server.tool(
 );
 
 server.tool(
+  "skool_edit_course",
+  "Edit a course's title, description, or privacy",
+  {
+    id: z.string().describe("Course ID to edit"),
+    title: z.string().optional().describe("New title"),
+    description: z.string().optional().describe("New description"),
+    privacy: z.enum(["open", "level", "buy", "time", "private"]).optional().describe("Access type"),
+  },
+  async (args) => {
+    const result = await client.editCourse({
+      id: args.id,
+      title: args.title,
+      description: args.description,
+      privacy: args.privacy,
+    });
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
   "skool_delete_course",
   "Delete a course by ID",
   {
