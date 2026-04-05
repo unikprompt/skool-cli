@@ -1,20 +1,8 @@
 # skool-cli
 
-CLI and programmatic API for [Skool.com](https://www.skool.com) automation. Create classroom lessons, community posts, and manage your Skool groups from the terminal.
+CLI and programmatic API for [Skool.com](https://www.skool.com) automation. Create courses, lessons, posts, and manage your Skool groups from the terminal.
 
-**Skool has no public API.** This tool uses browser automation (Playwright) to give you full programmatic access to Skool's features.
-
-## Killer Feature: Classroom Lessons
-
-Create rich HTML lessons in Skool's classroom with a single command. Supports headers, lists, code blocks, bold, italic, links, and images via TipTap editor injection.
-
-```bash
-skool create-lesson \
-  --group my-community \
-  --module "Getting Started" \
-  --title "Your First Lesson" \
-  --file lesson.md
-```
+**Skool has no public API.** This tool uses browser automation (Playwright) for auth and Skool's internal API for all content operations.
 
 ## Quick Start
 
@@ -34,112 +22,136 @@ npx playwright install chromium
 ### Authentication
 
 ```bash
-# Login (saves session for future use)
 skool login --email you@email.com --password yourpass
-
-# Check session status
 skool whoami --group my-community
 ```
 
-### Classroom (Lessons)
+### Courses
+
+```bash
+# Create a new course
+skool create-course -g my-community -t "Course Name" -d "Description"
+
+# Create course with privacy setting
+skool create-course -g my-community -t "Premium Course" -d "Desc" --privacy level
+# Privacy options: open (default), level, buy, time, private
+```
+
+### Lessons
 
 ```bash
 # Create lesson from markdown file
-skool create-lesson -g my-community -m "Module Name" -t "Lesson Title" -f lesson.md
+skool create-lesson -g my-community -m "Module" --course "Course" -t "Title" -f lesson.md
 
-# Create lesson from HTML
-skool create-lesson -g my-community -m "Module Name" -t "Lesson Title" --html lesson.html
+# Create lesson with video and resources
+skool create-lesson -g my-community -m "Module" --course "Course" -t "Title" \
+  --markdown "## Content" \
+  --video "https://youtu.be/xxx" \
+  --resource "Docs::https://docs.example.com" \
+  --resource "Slides::https://slides.example.com"
 
-# Create lesson from content JSON (with skool_class structure)
-skool create-lesson -g my-community -m "Module Name" -t "Lesson Title" -f content.json
+# Create lesson in a specific folder (by name or ID)
+skool create-lesson -g my-community -m "Module" --course "Course" --folder "Module 1" -t "Title" -f content.md
+skool create-lesson -g my-community -m "Module" --course "Course" --folder-id FOLDER_ID -t "Title" -f content.md
 
-# Inline markdown
-skool create-lesson -g my-community -m "Module Name" -t "Quick Tip" --markdown "## Hello\n\nThis is a lesson."
+# Edit an existing lesson
+skool edit-lesson --id PAGE_ID --title "New Title"
+skool edit-lesson --id PAGE_ID --file updated.md
+skool edit-lesson --id PAGE_ID --video "https://youtu.be/xxx"
+skool edit-lesson --id PAGE_ID --resource "Guide::https://example.com"
 
-# Edit an existing lesson (get ID from list-lessons --json)
-skool edit-lesson --id PAGE_ID --title "Updated Title"
-skool edit-lesson --id PAGE_ID --file updated-content.md
-skool edit-lesson --id PAGE_ID --title "New Title" --markdown "## Updated\n\nNew content."
+# Move a lesson to a different folder
+skool move-lesson --id PAGE_ID --target-folder "Module 2" -g my-community --course "Course"
+skool move-lesson --id PAGE_ID --target-folder-id FOLDER_ID
 
-# Delete a lesson
+# Delete a lesson or folder
 skool delete-lesson --id PAGE_ID
 
-# List lessons (to get IDs)
-skool list-lessons -g my-community
+# List lessons and folders
+skool list-lessons -g my-community --course "Course"
 skool list-lessons -g my-community --json
 ```
 
-### Community (Posts)
+### Folders (Modules)
 
 ```bash
-# Create a post
-skool create-post -g my-community -t "Welcome!" -b "Hello everyone..."
+skool create-folder -g my-community --course "Course" -t "Module Name"
+```
 
-# Create a post from file
-skool create-post -g my-community -t "Weekly Update" -f post.txt -c "General"
+### Community Posts
 
-# List posts
-skool get-posts -g my-community
+```bash
+skool create-post -g my-community -t "Title" -b "Body text" -c "General"
 skool get-posts -g my-community --json
-
-# List categories
 skool get-categories -g my-community
 ```
 
 ### Members
 
 ```bash
-# List members
 skool get-members -g my-community
-
-# Search members
-skool get-members -g my-community --search "mario"
-
-# JSON output
-skool get-members -g my-community --json
+skool get-members -g my-community --search "name" --json
 ```
 
-## Programmatic API
+## Content Format
 
-Use `skool-cli` as a library in your Node.js projects:
+Lessons support full markdown:
+
+- Headings (H1-H4), paragraphs
+- **Bold**, *italic*, ***bold+italic***, ~~strikethrough~~, `inline code`
+- Code blocks with language hints
+- Bullet and numbered lists
+- [Links](url) and ![images](url)
+- > Blockquotes
+- Horizontal rules (`---`)
+
+## Programmatic API
 
 ```typescript
 import { SkoolClient } from 'skool-cli';
 
 const client = new SkoolClient();
-
-// Login
 await client.login('you@email.com', 'yourpass');
 
-// Create a lesson
+// Create a course
+await client.createCourse({
+  group: 'my-community',
+  title: 'My Course',
+  description: 'Course description',
+});
+
+// Create a lesson with video and resources
 await client.createLesson({
   group: 'my-community',
-  module: 'Getting Started',
+  module: 'Module 1',
   title: 'Lesson 1',
-  markdownContent: '## Hello\n\nThis is a lesson.',
+  markdownContent: '## Hello\n\nThis is a lesson with an ![image](https://example.com/img.png)',
+  videoUrl: 'https://youtu.be/xxx',
+  resources: [
+    { title: 'Documentation', link: 'https://docs.example.com' },
+  ],
 });
 
 // Edit a lesson
 await client.editLesson({
   id: 'lesson-page-id',
   title: 'Updated Title',
-  markdownContent: '## Updated\n\nNew content here.',
+  markdownContent: '## Updated content',
 });
 
-// Create a post
-await client.createPost({
+// Move a lesson
+await client.moveLesson({
+  id: 'lesson-page-id',
+  targetFolder: 'Module 2',
   group: 'my-community',
-  title: 'Welcome!',
-  body: 'Hello everyone...',
-  category: 'General',
+  course: 'My Course',
 });
 
-// Read data
+// Community
+await client.createPost({ group: 'my-community', title: 'Hello!', body: 'Post body' });
 const { posts } = await client.getPosts('my-community');
-const { categories } = await client.getCategories('my-community');
 const { members } = await client.getMembers('my-community');
 
-// Cleanup
 await client.close();
 ```
 
@@ -149,55 +161,14 @@ await client.close();
 |----------|-------------|
 | `SKOOL_EMAIL` | Default email for login |
 | `SKOOL_PASSWORD` | Default password for login |
-| `SKOOL_GROUP` | Default group slug (avoids passing `--group` every time) |
+| `SKOOL_GROUP` | Default group slug (avoids `--group` every time) |
 | `SKOOL_CLI_HEADLESS` | Set to `false` for visible browser (debugging) |
 | `SKOOL_CLI_DATA_DIR` | Custom data directory (default: `~/.skool-cli/`) |
 | `SKOOL_CLI_TIMEOUT` | Operation timeout in ms (default: 30000) |
 
-## How It Works
-
-1. **Login**: Playwright opens a headless Chromium browser and logs into Skool
-2. **Session persistence**: Browser profile is saved to `~/.skool-cli/browser-data/`, so subsequent runs reuse the session without re-logging in
-3. **Operations**: Each command navigates to the appropriate Skool page and interacts with it programmatically
-4. **TipTap injection**: For classroom lessons, HTML is injected directly into Skool's TipTap editor via `editor.commands.setContent()`
-
-## Supported Content Formats
-
-The `create-lesson` command accepts:
-
-- **Markdown** (`.md`): Converted to TipTap-compatible HTML automatically
-- **HTML** (`.html`): Injected directly into the editor
-- **JSON** (`.json`): Extracts `skool_class` structure and converts to HTML (compatible with content pipeline JSONs)
-
-### Supported HTML Elements
-
-Headers (h1-h4), paragraphs, bold, italic, strikethrough, inline code, code blocks, ordered/unordered lists, blockquotes, horizontal rules, links, images.
-
-**Not supported by Skool's editor**: Tables, iframes (except video embeds), forms.
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| "Browser not found" | Run `npx playwright install chromium` |
-| Login fails | Check email/password. Try `SKOOL_CLI_HEADLESS=false` to see the browser |
-| Session expired | Run `skool login` again |
-| SAVE button not working | Known Skool quirk. The CLI handles this automatically with a dirty-state trigger |
-| Title too long | Automatically truncated to 50 characters |
-| Community posts look plain | Skool community posts only support plain text (no HTML) |
-
 ## Use as Claude Code Skill
 
-For Claude Code users, the **skill** approach is lighter than MCP (no context overhead from tool schemas).
-
 Copy `skill/SKILL.md` to your project:
-
-```bash
-mkdir -p .claude/skills/skool-cli
-cp node_modules/skool-cli/skill/SKILL.md .claude/skills/skool-cli/SKILL.md
-```
-
-Or download from GitHub:
 
 ```bash
 mkdir -p .claude/skills/skool-cli
@@ -208,7 +179,7 @@ Then tell Claude Code: "Create a lesson in Skool about X" and it will use the CL
 
 ## Use as MCP Server
 
-For Cursor, Windsurf, or other MCP clients, add to your MCP config:
+For Cursor, Windsurf, or other MCP clients:
 
 ```json
 {
@@ -220,6 +191,16 @@ For Cursor, Windsurf, or other MCP clients, add to your MCP config:
   }
 }
 ```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| "Browser not found" | `npx playwright install chromium` |
+| Login fails | Try `SKOOL_CLI_HEADLESS=false` to see the browser |
+| Session expired | Run `skool login` again |
+| Image not showing | URL must allow hotlinking |
+| Title too long | Auto-truncated to 50 chars |
 
 ## Learn More
 
