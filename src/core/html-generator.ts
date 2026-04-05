@@ -39,6 +39,11 @@ function applyInlineFormatting(text: string): string {
   formatted = formatted.replace(/~~(.*?)~~/g, "<s>$1</s>");
   // Inline code: `text`
   formatted = formatted.replace(/`(.*?)`/g, "<code>$1</code>");
+  // Images: ![alt](url) — must be before links to avoid conflict
+  formatted = formatted.replace(
+    /!\[([^\]]*)\]\(([^)]+)\)/g,
+    '<img src="$2" alt="$1">'
+  );
   // Links: [text](url)
   formatted = formatted.replace(
     /\[([^\]]+)\]\(([^)]+)\)/g,
@@ -90,6 +95,14 @@ function textToHtml(text: string): string {
       if (headerMatch) {
         const level = headerMatch[1].length;
         html += `<h${level}>${applyInlineFormatting(headerMatch[2])}</h${level}>`;
+        i++;
+        continue;
+      }
+
+      // Standalone image: ![alt](url) on its own line
+      const imgMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+      if (imgMatch) {
+        html += `<img src="${imgMatch[2]}" alt="${imgMatch[1]}">`;
         i++;
         continue;
       }

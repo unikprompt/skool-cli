@@ -20,8 +20,8 @@ function htmlToSkoolDesc(html: string): string {
   const nodes: Record<string, unknown>[] = [];
 
   // Simple HTML parser — convert HTML tags to TipTap JSON nodes
-  // Split by block-level tags
-  const blockRegex = /<(h[1-4]|p|ul|ol|pre|hr|blockquote)[^>]*>([\s\S]*?)<\/\1>|<hr\s*\/?>/gi;
+  // Split by block-level tags (including self-closing img)
+  const blockRegex = /<(h[1-4]|p|ul|ol|pre|hr|blockquote)[^>]*>([\s\S]*?)<\/\1>|<hr\s*\/?>|<img\s+[^>]*\/?>/gi;
   let match;
   let lastIndex = 0;
 
@@ -62,6 +62,21 @@ function htmlToSkoolDesc(html: string): string {
       });
     } else if (match[0].startsWith("<hr")) {
       nodes.push({ type: "horizontalRule" });
+    } else if (match[0].startsWith("<img")) {
+      const srcMatch = match[0].match(/src="([^"]+)"/);
+      const altMatch = match[0].match(/alt="([^"]*)"/);
+      if (srcMatch) {
+        nodes.push({
+          type: "image",
+          attrs: {
+            src: srcMatch[1],
+            alt: altMatch ? altMatch[1] : "",
+            title: altMatch ? altMatch[1] : "",
+            originalSrc: srcMatch[1],
+            fileID: "",
+          },
+        });
+      }
     }
   }
 
