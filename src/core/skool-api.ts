@@ -754,6 +754,36 @@ export class SkoolApi {
   }
 
   /**
+   * Create a community post via API.
+   */
+  async createPost(options: {
+    groupId: string;
+    title: string;
+    content: string;
+    labels: string;
+  }): Promise<{ success: boolean; postId: string; message: string }> {
+    const result = await this.request("POST", "/posts?follow=true", {
+      post_type: "generic",
+      group_id: options.groupId,
+      metadata: {
+        title: options.title,
+        content: options.content,
+        attachments: "",
+        labels: options.labels,
+        action: 0,
+        video_ids: "",
+      },
+    });
+
+    if (result.status !== 200) {
+      return { success: false, postId: "", message: `Create post failed: ${JSON.stringify(result.data)}` };
+    }
+
+    const postId = (result.data.id as string) || "";
+    return { success: true, postId, message: `Post "${options.title}" created. ID: ${postId}` };
+  }
+
+  /**
    * Update an existing post's title, content, or category.
    */
   async updatePost(

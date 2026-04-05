@@ -817,35 +817,64 @@ export class SkoolClient {
   // Community
   // ----------------------------------------------------------
 
-  /** Create a community post */
+  /** Create a community post via API */
   async createPost(options: CreatePostOptions): Promise<OperationResult> {
-    // Check auth first
-    await this.ops.gotoCommunity(options.group);
-    const authenticated = await this.ops.isAuthenticated();
-    if (!authenticated) {
-      return {
-        success: false,
-        message: "Not authenticated. Run: skool login",
-      };
-    }
-
     try {
-      await this.ops.createCommunityPost(
-        options.group,
-        options.title,
-        options.body,
-        options.category
-      );
-      return {
-        success: true,
-        message: `Post "${options.title}" created successfully.`,
-      };
+      const { groupId } = await this.discoverGroupIds(options.group);
+      if (!groupId) {
+        return { success: false, message: "Could not discover group ID." };
+      }
+
+      // Resolve category name to ID if needed
+      let labelId = "";
+      if (options.category) {
+        const cats = await this.getCategoriesFromApi(options.group);
+        const match = cats.find(
+          (c) => c.name.toLowerCase() === options.category!.toLowerCase()
+        );
+        labelId = match ? match.id : options.category;
+      }
+
+      if (!labelId) {
+        // Get first category as default
+        const cats = await this.getCategoriesFromApi(options.group);
+        if (cats.length > 0) labelId = cats[0].id;
+      }
+
+      const result = await this.api.createPost({
+        groupId,
+        title: options.title,
+        content: options.body,
+        labels: labelId,
+      });
+
+      return { success: result.success, message: result.message };
     } catch (error) {
       return {
         success: false,
         message: `Failed to create post: ${(error as Error).message}`,
       };
     }
+  }
+
+  /** Get categories from __NEXT_DATA__ */
+  private async getCategoriesFromApi(
+    groupSlug: string
+  ): Promise<{ id: string; name: string }[]> {
+    const page = await this.browser.getPage();
+    await page.goto(`https://www.skool.com/${groupSlug}`);
+    await page.waitForTimeout(3000);
+
+    return page.evaluate(() => {
+      const script = document.querySelector("script#__NEXT_DATA__");
+      if (!script) return [];
+      const d = JSON.parse(script.textContent || "{}");
+      const labels = d?.props?.pageProps?.currentGroup?.labels || [];
+      return labels.map((l: Record<string, unknown>) => ({
+        id: l.id as string,
+        name: ((l.metadata as Record<string, unknown>)?.displayName as string) || "",
+      }));
+    });
   }
 
   /** Get posts from a community */
@@ -1080,16 +1109,43 @@ export class SkoolClient {
     groupSlug: string
   ): Promise<{ success: boolean; posts: SkoolPost[] }> {
     try {
-      const raw = await this.ops.extractPosts(groupSlug);
-      const posts: SkoolPost[] = raw.map((p) => ({
-        title: p.title,
-        author: p.author,
-        category: p.category,
-        likes: 0,
-        comments: 0,
-        preview: p.preview,
-        url: p.url,
-      }));
+      const page = await this.browser.getPage();
+      await page.goto(`https://www.skool.com/${groupSlug}`);
+      await page.waitForTimeout(3000);
+
+      const posts = await page.evaluate(
+        ({ slug }) => {
+          const script = document.querySelector("script#__NEXT_DATA__");
+          if (!script) return [];
+          const d = JSON.parse(script.textContent || "{}");
+          const pp = d?.props?.pageProps || {};
+          const trees = pp.postTrees || [];
+          const labels = pp.currentGroup?.labels || [];
+          const labelMap: Record<string, string> = {};
+          for (const l of labels) {
+            if (l?.id && l?.metadata?.displayName) {
+              labelMap[l.id] = l.metadata.displayName;
+            }
+          }
+          return trees.map((t: Record<string, unknown>) => {
+            const p = t.post as Record<string, unknown> || t;
+            const meta = (p?.metadata || {}) as Record<string, unknown>;
+            const user = (t.user || {}) as Record<string, unknown>;
+            return {
+              id: String(p.id || ""),
+              title: String(meta.title || ""),
+              author: String(user.name || ""),
+              category: labelMap[String(meta.labels || "")] || "",
+              likes: Number(meta.num_likes || 0),
+              comments: Number(meta.num_comments || 0),
+              preview: String(meta.content || "").slice(0, 100),
+              url: `/${slug}/${String(p.name || "")}`,
+            };
+          });
+        },
+        { slug: groupSlug }
+      );
+
       return { success: true, posts };
     } catch (error) {
       return { success: false, posts: [] };
@@ -1101,8 +1157,8 @@ export class SkoolClient {
     groupSlug: string
   ): Promise<{ success: boolean; categories: string[] }> {
     try {
-      const categories = await this.ops.extractCategories(groupSlug);
-      return { success: true, categories };
+      const cats = await this.getCategoriesFromApi(groupSlug);
+      return { success: true, categories: cats.map((c) => c.name) };
     } catch {
       return { success: false, categories: [] };
     }
