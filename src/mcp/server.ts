@@ -104,6 +104,28 @@ server.tool(
 );
 
 server.tool(
+  "skool_edit_lesson",
+  "Edit an existing lesson's title and/or content",
+  {
+    id: z.string().describe("Lesson ID to edit"),
+    title: z.string().optional().describe("New title"),
+    html_content: z.string().optional().describe("HTML content"),
+    markdown_content: z.string().optional().describe("Markdown content"),
+  },
+  async (args) => {
+    const result = await client.editLesson({
+      id: args.id,
+      title: args.title,
+      htmlContent: args.html_content,
+      markdownContent: args.markdown_content,
+    });
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
   "skool_delete_lesson",
   "Delete a lesson or folder by ID",
   {

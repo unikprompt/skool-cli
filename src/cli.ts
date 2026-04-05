@@ -9,6 +9,7 @@ import { createPostCommand } from "./commands/create-post.js";
 import { getPostsCommand } from "./commands/get-posts.js";
 import { getCategoriesCommand } from "./commands/get-categories.js";
 import { getMembersCommand } from "./commands/get-members.js";
+import { editLessonCommand } from "./commands/edit-lesson.js";
 import { deleteLessonCommand } from "./commands/delete-lesson.js";
 import { listLessonsCommand } from "./commands/list-lessons.js";
 
@@ -28,6 +29,7 @@ program.addCommand(whoamiCommand);
 // Classroom
 program.addCommand(createLessonCommand);
 program.addCommand(createFolderCommand);
+program.addCommand(editLessonCommand);
 program.addCommand(deleteLessonCommand);
 program.addCommand(listLessonsCommand);
 

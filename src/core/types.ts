@@ -42,6 +42,15 @@ export interface CreateLessonOptions {
   filePath?: string;
 }
 
+/** Options for editing an existing lesson */
+export interface EditLessonOptions {
+  id: string;
+  title?: string;
+  htmlContent?: string;
+  markdownContent?: string;
+  filePath?: string;
+}
+
 /** Options for creating a folder */
 export interface CreateFolderOptions {
   group: string;

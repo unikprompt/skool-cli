@@ -274,6 +274,33 @@ export class SkoolApi {
   }
 
   /**
+   * Update an existing page's title and/or content.
+   */
+  async updatePage(
+    pageId: string,
+    title?: string,
+    content?: string
+  ): Promise<{ success: boolean; message: string }> {
+    const body: Record<string, unknown> = {
+      transcript: null,
+      video_id: "",
+    };
+    if (title) body.title = title;
+    if (content) body.desc = htmlToSkoolDesc(content);
+
+    const result = await this.request("PUT", `/courses/${pageId}`, body);
+
+    if (result.status !== 200) {
+      return {
+        success: false,
+        message: `Update failed with status ${result.status}: ${JSON.stringify(result.data)}`,
+      };
+    }
+
+    return { success: true, message: `Lesson ${pageId} updated successfully` };
+  }
+
+  /**
    * List courses and their modules for a group.
    * This gives us the real root_id and parent_id (folder IDs) needed for API calls.
    */

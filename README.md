@@ -55,6 +55,18 @@ skool create-lesson -g my-community -m "Module Name" -t "Lesson Title" -f conten
 
 # Inline markdown
 skool create-lesson -g my-community -m "Module Name" -t "Quick Tip" --markdown "## Hello\n\nThis is a lesson."
+
+# Edit an existing lesson (get ID from list-lessons --json)
+skool edit-lesson --id PAGE_ID --title "Updated Title"
+skool edit-lesson --id PAGE_ID --file updated-content.md
+skool edit-lesson --id PAGE_ID --title "New Title" --markdown "## Updated\n\nNew content."
+
+# Delete a lesson
+skool delete-lesson --id PAGE_ID
+
+# List lessons (to get IDs)
+skool list-lessons -g my-community
+skool list-lessons -g my-community --json
 ```
 
 ### Community (Posts)
@@ -105,6 +117,13 @@ await client.createLesson({
   module: 'Getting Started',
   title: 'Lesson 1',
   markdownContent: '## Hello\n\nThis is a lesson.',
+});
+
+// Edit a lesson
+await client.editLesson({
+  id: 'lesson-page-id',
+  title: 'Updated Title',
+  markdownContent: '## Updated\n\nNew content here.',
 });
 
 // Create a post

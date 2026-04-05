@@ -5,6 +5,7 @@ import { SkoolApi } from "./skool-api.js";
 import { markdownToHtml, structuredContentToHtml } from "./html-generator.js";
 import type {
   CreateLessonOptions,
+  EditLessonOptions,
   CreateFolderOptions,
   CreatePostOptions,
   OperationResult,
@@ -372,6 +373,49 @@ export class SkoolClient {
       return {
         success: false,
         message: `Failed to create lesson: ${(error as Error).message}`,
+      };
+    }
+  }
+
+  /** Edit an existing lesson's title and/or content */
+  async editLesson(options: EditLessonOptions): Promise<OperationResult> {
+    let html: string | undefined;
+
+    if (options.htmlContent) {
+      html = options.htmlContent;
+    } else if (options.markdownContent) {
+      html = markdownToHtml(options.markdownContent);
+    } else if (options.filePath) {
+      const content = readFileSync(options.filePath, "utf-8");
+
+      if (options.filePath.endsWith(".json")) {
+        const parsed = JSON.parse(content);
+        const sc = parsed.skool_class || parsed;
+        html = structuredContentToHtml(sc);
+      } else if (
+        options.filePath.endsWith(".html") ||
+        options.filePath.endsWith(".htm")
+      ) {
+        html = content;
+      } else {
+        html = markdownToHtml(content);
+      }
+    }
+
+    if (!options.title && !html) {
+      return {
+        success: false,
+        message: "Nothing to update. Provide --title, --file, --html, or --markdown.",
+      };
+    }
+
+    try {
+      const result = await this.api.updatePage(options.id, options.title, html);
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to edit lesson: ${(error as Error).message}`,
       };
     }
   }
