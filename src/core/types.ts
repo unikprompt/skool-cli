@@ -29,6 +29,12 @@ export interface SkoolModule {
   lessons: string[];
 }
 
+/** A resource attached to a lesson (link or file) */
+export interface LessonResource {
+  title: string;
+  link: string;
+}
+
 /** Options for creating a lesson */
 export interface CreateLessonOptions {
   group: string;
@@ -40,6 +46,8 @@ export interface CreateLessonOptions {
   htmlContent?: string;
   markdownContent?: string;
   filePath?: string;
+  videoUrl?: string;
+  resources?: LessonResource[];
 }
 
 /** Options for editing an existing lesson */
@@ -49,6 +57,8 @@ export interface EditLessonOptions {
   htmlContent?: string;
   markdownContent?: string;
   filePath?: string;
+  videoUrl?: string;
+  resources?: LessonResource[];
 }
 
 /** Options for creating a folder */

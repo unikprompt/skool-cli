@@ -363,6 +363,8 @@ export class SkoolClient {
         rootId,
         title: options.title,
         content: html,
+        videoUrl: options.videoUrl,
+        resources: options.resources,
       });
 
       return {
@@ -402,15 +404,20 @@ export class SkoolClient {
       }
     }
 
-    if (!options.title && !html) {
+    if (!options.title && !html && !options.videoUrl && !options.resources) {
       return {
         success: false,
-        message: "Nothing to update. Provide --title, --file, --html, or --markdown.",
+        message: "Nothing to update. Provide --title, --file, --html, --markdown, --video, or --resource.",
       };
     }
 
     try {
-      const result = await this.api.updatePage(options.id, options.title, html);
+      const result = await this.api.updatePage(options.id, {
+        title: options.title,
+        content: html,
+        videoUrl: options.videoUrl,
+        resources: options.resources,
+      });
       return { success: result.success, message: result.message };
     } catch (error) {
       return {

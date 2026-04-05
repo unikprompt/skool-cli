@@ -65,6 +65,8 @@ server.tool(
     course: z.string().optional().describe("Course name (if multiple courses)"),
     folder: z.string().optional().describe("Folder/module name to create lesson in"),
     folder_id: z.string().optional().describe("Folder ID directly"),
+    video_url: z.string().optional().describe("YouTube/Vimeo/Loom video URL"),
+    resources: z.array(z.object({ title: z.string(), link: z.string() })).optional().describe("Attached resource links"),
   },
   async (args) => {
     const result = await client.createLesson({
@@ -76,6 +78,8 @@ server.tool(
       folderId: args.folder_id,
       markdownContent: args.markdown_content,
       htmlContent: args.html_content,
+      videoUrl: args.video_url,
+      resources: args.resources,
     });
     return {
       content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
@@ -111,6 +115,8 @@ server.tool(
     title: z.string().optional().describe("New title"),
     html_content: z.string().optional().describe("HTML content"),
     markdown_content: z.string().optional().describe("Markdown content"),
+    video_url: z.string().optional().describe("YouTube/Vimeo/Loom video URL"),
+    resources: z.array(z.object({ title: z.string(), link: z.string() })).optional().describe("Attached resource links"),
   },
   async (args) => {
     const result = await client.editLesson({
@@ -118,6 +124,8 @@ server.tool(
       title: args.title,
       htmlContent: args.html_content,
       markdownContent: args.markdown_content,
+      videoUrl: args.video_url,
+      resources: args.resources,
     });
     return {
       content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],

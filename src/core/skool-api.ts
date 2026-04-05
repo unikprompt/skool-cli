@@ -240,8 +240,10 @@ export class SkoolApi {
     rootId: string;
     title: string;
     content?: string;
+    videoUrl?: string;
+    resources?: { title: string; link: string }[];
   }): Promise<{ success: boolean; pageId: string; message: string }> {
-    const { groupId, userId, parentId, rootId, title, content } = options;
+    const { groupId, userId, parentId, rootId, title, content, videoUrl, resources } = options;
 
     // Step 1: Create the page
     const createResult = await this.request("POST", "/courses", {
@@ -267,22 +269,20 @@ export class SkoolApi {
 
     const pageId = createResult.data.id as string;
 
-    // Step 2: If content provided, update the page with content
-    // Skool uses TipTap JSON format with [v2] prefix for the desc field
-    if (content) {
-      const desc = htmlToSkoolDesc(content);
-      const updateResult = await this.request("PUT", `/courses/${pageId}`, {
+    // Step 2: Update the page with content, video, and/or resources
+    if (content || videoUrl || resources) {
+      const updateResult = await this.updatePage(pageId, {
         title,
-        desc,
-        transcript: null,
-        video_id: "",
+        content,
+        videoUrl,
+        resources,
       });
 
-      if (updateResult.status !== 200) {
+      if (!updateResult.success) {
         return {
           success: true,
           pageId,
-          message: `Page created but content update failed (${updateResult.status}): ${JSON.stringify(updateResult.data)}`,
+          message: `Page created but update failed: ${updateResult.message}`,
         };
       }
     }
@@ -295,19 +295,57 @@ export class SkoolApi {
   }
 
   /**
-   * Update an existing page's title and/or content.
+   * Fetch video metadata from a URL (YouTube, Vimeo, Loom, etc.)
+   */
+  async getVideoMeta(
+    url: string
+  ): Promise<{ lenMs: number; thumbnail: string } | null> {
+    const encoded = encodeURIComponent(url);
+    const result = await this.request(
+      "POST",
+      `/video-meta?url=${encoded}&width=1280`
+    );
+    if (result.status === 200 && result.data) {
+      return {
+        lenMs: (result.data.duration_ms as number) || 0,
+        thumbnail: (result.data.thumbnail as string) || "",
+      };
+    }
+    return null;
+  }
+
+  /**
+   * Update an existing page's title, content, video, and/or resources.
    */
   async updatePage(
     pageId: string,
-    title?: string,
-    content?: string
+    options: {
+      title?: string;
+      content?: string;
+      videoUrl?: string;
+      resources?: { title: string; link: string }[];
+    }
   ): Promise<{ success: boolean; message: string }> {
     const body: Record<string, unknown> = {
       transcript: null,
       video_id: "",
     };
-    if (title) body.title = title;
-    if (content) body.desc = htmlToSkoolDesc(content);
+    if (options.title) body.title = options.title;
+    if (options.content) body.desc = htmlToSkoolDesc(options.content);
+
+    if (options.videoUrl) {
+      body.video_link = options.videoUrl;
+      const meta = await this.getVideoMeta(options.videoUrl);
+      if (meta) {
+        body.video_len_ms = meta.lenMs;
+        body.video_thumbnail = meta.thumbnail;
+      }
+    }
+
+    if (options.resources) {
+      body.resources = options.resources;
+      body.update_resources = true;
+    }
 
     const result = await this.request("PUT", `/courses/${pageId}`, body);
 
