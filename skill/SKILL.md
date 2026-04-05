@@ -301,6 +301,7 @@ Set these to avoid passing flags every time:
 export SKOOL_GROUP=my-group-slug
 export SKOOL_EMAIL=me@email.com
 export SKOOL_PASSWORD=mypassword
+export SKOOL_CLI_NO_UPDATE_CHECK=true  # Disable update notifications
 ```
 
 ## Troubleshooting

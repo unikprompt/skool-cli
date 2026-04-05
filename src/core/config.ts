@@ -22,3 +22,16 @@ export const SPA_NAV_DELAY = 2000;
 
 /** Max characters for lesson titles in Skool */
 export const MAX_TITLE_LENGTH = 50;
+
+/** File to cache update check state */
+export const UPDATE_CHECK_FILE = join(DATA_DIR, "update-check.json");
+
+/** Interval between update checks (24 hours) */
+export const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
+
+/** npm registry URL for version check */
+export const NPM_REGISTRY_URL = "https://registry.npmjs.org/skool-cli/latest";
+
+/** Disable update checks via env var */
+export const UPDATE_CHECK_DISABLED =
+  process.env.SKOOL_CLI_NO_UPDATE_CHECK === "true";

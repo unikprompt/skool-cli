@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
 import { Command } from "commander";
+import { checkForUpdate } from "./core/update-checker.js";
 import { loginCommand } from "./commands/login.js";
 import { whoamiCommand } from "./commands/whoami.js";
 import { createCourseCommand } from "./commands/create-course.js";
@@ -24,14 +26,18 @@ import { moveLessonCommand } from "./commands/move-lesson.js";
 import { deleteLessonCommand } from "./commands/delete-lesson.js";
 import { listLessonsCommand } from "./commands/list-lessons.js";
 
+const pkg = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf-8")
+) as { version: string };
+
 const program = new Command();
 
 program
   .name("skool")
   .description(
-    "CLI for Skool.com automation — create lessons, posts, and manage communities"
+    "CLI for Skool.com automation, create lessons, posts, and manage communities"
   )
-  .version("1.0.0");
+  .version(pkg.version);
 
 // Auth
 program.addCommand(loginCommand);
@@ -100,3 +106,5 @@ program.addCommand(getChatMessagesCommand);
 program.addCommand(sendChatMessageCommand);
 
 program.parse();
+
+checkForUpdate(pkg.version).catch(() => {});
