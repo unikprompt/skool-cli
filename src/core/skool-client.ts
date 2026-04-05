@@ -400,6 +400,51 @@ export class SkoolClient {
     }
   }
 
+  /** Move a lesson to a different folder */
+  async moveLesson(options: {
+    id: string;
+    targetFolderId?: string;
+    targetFolder?: string;
+    group?: string;
+    course?: string;
+  }): Promise<OperationResult> {
+    let targetId = options.targetFolderId;
+
+    if (!targetId && options.targetFolder && options.group) {
+      const { groupId, rootId } = await this.discoverIds(
+        options.group,
+        options.course
+      );
+      if (!rootId) {
+        return { success: false, message: "Could not discover course IDs." };
+      }
+      targetId = await this.findFolderByName(groupId, rootId, options.targetFolder) || undefined;
+      if (!targetId) {
+        return {
+          success: false,
+          message: `Folder "${options.targetFolder}" not found. Use --target-folder-id with the ID directly.`,
+        };
+      }
+    }
+
+    if (!targetId) {
+      return {
+        success: false,
+        message: "No target specified. Use --target-folder or --target-folder-id.",
+      };
+    }
+
+    try {
+      const result = await this.api.movePage(options.id, targetId);
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to move lesson: ${(error as Error).message}`,
+      };
+    }
+  }
+
   /** List all lessons and folders in a course (from sidebar DOM) */
   async listLessons(
     groupSlug: string,

@@ -51,6 +51,12 @@ npx skool-cli edit-lesson --id PAGE_ID --title "Title" --markdown "## Updated\n\
 npx skool-cli edit-lesson --id PAGE_ID --video "https://youtu.be/xxx"
 npx skool-cli edit-lesson --id PAGE_ID --resource "Link Title::https://url.com"
 
+# Move lesson to a different folder (by folder name)
+npx skool-cli move-lesson --id PAGE_ID --target-folder "Module Name" -g GROUP --course "COURSE"
+
+# Move lesson to a different folder (by folder ID)
+npx skool-cli move-lesson --id PAGE_ID --target-folder-id FOLDER_ID
+
 # Delete lesson or folder by ID
 npx skool-cli delete-lesson --id PAGE_ID
 

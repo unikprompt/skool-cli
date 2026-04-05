@@ -454,6 +454,28 @@ export class SkoolApi {
   }
 
   /**
+   * Move a page to a different parent folder.
+   */
+  async movePage(
+    pageId: string,
+    newParentId: string
+  ): Promise<{ success: boolean; message: string }> {
+    const result = await this.request(
+      "POST",
+      `/courses/${pageId}/update-parent?parent=${newParentId}`
+    );
+
+    if (result.status !== 200) {
+      return {
+        success: false,
+        message: `Move failed with status ${result.status}: ${JSON.stringify(result.data)}`,
+      };
+    }
+
+    return { success: true, message: `Lesson ${pageId} moved successfully` };
+  }
+
+  /**
    * Delete a page by ID.
    */
   async deletePage(pageId: string): Promise<boolean> {

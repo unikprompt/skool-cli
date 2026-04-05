@@ -10,6 +10,7 @@ import { getPostsCommand } from "./commands/get-posts.js";
 import { getCategoriesCommand } from "./commands/get-categories.js";
 import { getMembersCommand } from "./commands/get-members.js";
 import { editLessonCommand } from "./commands/edit-lesson.js";
+import { moveLessonCommand } from "./commands/move-lesson.js";
 import { deleteLessonCommand } from "./commands/delete-lesson.js";
 import { listLessonsCommand } from "./commands/list-lessons.js";
 
@@ -30,6 +31,7 @@ program.addCommand(whoamiCommand);
 program.addCommand(createLessonCommand);
 program.addCommand(createFolderCommand);
 program.addCommand(editLessonCommand);
+program.addCommand(moveLessonCommand);
 program.addCommand(deleteLessonCommand);
 program.addCommand(listLessonsCommand);
 

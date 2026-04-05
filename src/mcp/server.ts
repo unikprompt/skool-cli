@@ -134,6 +134,30 @@ server.tool(
 );
 
 server.tool(
+  "skool_move_lesson",
+  "Move a lesson to a different folder",
+  {
+    id: z.string().describe("Lesson ID to move"),
+    target_folder_id: z.string().optional().describe("Target folder ID"),
+    target_folder: z.string().optional().describe("Target folder name"),
+    group: z.string().optional().describe("Skool group slug (required with target_folder)"),
+    course: z.string().optional().describe("Course name"),
+  },
+  async (args) => {
+    const result = await client.moveLesson({
+      id: args.id,
+      targetFolderId: args.target_folder_id,
+      targetFolder: args.target_folder,
+      group: args.group,
+      course: args.course,
+    });
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
   "skool_delete_lesson",
   "Delete a lesson or folder by ID",
   {
