@@ -45,6 +45,12 @@ skool edit-course --id COURSE_ID --cover new-cover.jpg -g my-community
 skool list-courses -g my-community
 skool list-courses -g my-community --json
 
+# Move a course left/right in the classroom
+skool move-course --id COURSE_ID --direction right
+
+# Duplicate a course (copies all content)
+skool duplicate-course --id COURSE_ID
+
 # Delete a course
 skool delete-course --id COURSE_ID
 ```
@@ -113,7 +119,7 @@ Lessons support full markdown:
 - **Bold**, *italic*, ***bold+italic***, ~~strikethrough~~, `inline code`
 - Code blocks with language hints
 - Bullet and numbered lists
-- [Links](url) and ![images](url)
+- [Links](url) and ![images](url) (local files auto-uploaded)
 - > Blockquotes
 - Horizontal rules (`---`)
 
@@ -133,9 +139,11 @@ await client.createCourse({
   coverImage: './cover.jpg',
 });
 
-// List and edit courses
+// List, edit, move, duplicate courses
 const { courses } = await client.listCourses('my-community');
 await client.editCourse({ id: courses[0].id, title: 'Updated Name' });
+await client.moveCourse(courses[0].id, 'right');
+await client.duplicateCourse(courses[0].id);
 await client.deleteCourse(courses[0].id);
 
 // Create a lesson with video and resources
@@ -143,7 +151,7 @@ await client.createLesson({
   group: 'my-community',
   module: 'Module 1',
   title: 'Lesson 1',
-  markdownContent: '## Hello\n\nThis is a lesson with an ![image](https://example.com/img.png)',
+  markdownContent: '## Hello\n\nThis is a lesson with an ![image](./photo.jpg)',
   videoUrl: 'https://youtu.be/xxx',
   resources: [
     { title: 'Documentation', link: 'https://docs.example.com' },
