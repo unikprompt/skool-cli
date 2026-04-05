@@ -52,9 +52,11 @@ program.addCommand(listLessonsCommand);
 
 // Calendar
 import { createEventCommand } from "./commands/create-event.js";
+import { editEventCommand } from "./commands/edit-event.js";
 import { listEventsCommand } from "./commands/list-events.js";
 import { deleteEventCommand } from "./commands/delete-event.js";
 program.addCommand(createEventCommand);
+program.addCommand(editEventCommand);
 program.addCommand(listEventsCommand);
 program.addCommand(deleteEventCommand);
 

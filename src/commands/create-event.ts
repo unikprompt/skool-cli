@@ -10,9 +10,30 @@ export const createEventCommand = new Command("create-event")
   .option("-d, --description <text>", "Event description")
   .option("--timezone <tz>", "Timezone (default: America/New_York)")
   .option("--cover <path>", "Cover image file path")
+  .option("--repeat <schedule>", "Recurrence: weekly:mon,wed or daily or biweekly:fri")
   .action(async (opts) => {
     const client = new SkoolClient();
     try {
+      // Parse recurrence
+      let recurrence: { frequency: string; interval: number; days: number[] } | undefined;
+      if (opts.repeat) {
+        const dayMap: Record<string, number> = {
+          mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 0,
+        };
+        const parts = opts.repeat.split(":");
+        const freq = parts[0].toLowerCase();
+        const dayNames = parts[1] ? parts[1].split(",") : [];
+        const days = dayNames.map((d: string) => dayMap[d.trim().toLowerCase()] ?? -1).filter((d: number) => d >= 0);
+
+        if (freq === "daily") {
+          recurrence = { frequency: "daily", interval: 1, days: [] };
+        } else if (freq === "weekly") {
+          recurrence = { frequency: "weekly", interval: 1, days };
+        } else if (freq === "biweekly") {
+          recurrence = { frequency: "weekly", interval: 2, days };
+        }
+      }
+
       console.log(`Creating event "${opts.title}"...`);
       const result = await client.createEvent({
         group: opts.group,
@@ -22,6 +43,7 @@ export const createEventCommand = new Command("create-event")
         endTime: opts.end,
         timezone: opts.timezone,
         coverImage: opts.cover,
+        recurrence,
       });
       console.log(result.success ? `OK: ${result.message}` : `FAIL: ${result.message}`);
       process.exit(result.success ? 0 : 1);

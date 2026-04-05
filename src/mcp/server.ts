@@ -388,6 +388,34 @@ server.tool(
 );
 
 server.tool(
+  "skool_edit_event",
+  "Edit a calendar event",
+  {
+    id: z.string().describe("Event ID to edit"),
+    group: z.string().describe("Skool group slug"),
+    title: z.string().optional().describe("New title"),
+    description: z.string().optional().describe("New description"),
+    start_time: z.string().optional().describe("New start time (ISO 8601)"),
+    end_time: z.string().optional().describe("New end time (ISO 8601)"),
+    timezone: z.string().optional().describe("New timezone"),
+  },
+  async (args) => {
+    const result = await client.editEvent({
+      id: args.id,
+      group: args.group,
+      title: args.title,
+      description: args.description,
+      startTime: args.start_time,
+      endTime: args.end_time,
+      timezone: args.timezone,
+    });
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
   "skool_list_events",
   "List calendar events",
   {

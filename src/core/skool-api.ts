@@ -655,6 +655,7 @@ export class SkoolApi {
     endTime: string;
     timezone?: string;
     coverImage?: string;
+    recurrence?: { frequency: string; interval: number; days: number[] };
   }): Promise<{ success: boolean; eventId: string; message: string }> {
     const metadata: Record<string, unknown> = {
       title: options.title,
@@ -666,12 +667,15 @@ export class SkoolApi {
     };
     if (options.coverImage) metadata.cover_image = options.coverImage;
 
-    const result = await this.request("POST", "/calendar-events", {
+    const body: Record<string, unknown> = {
       group_id: options.groupId,
       start_time: options.startTime,
       end_time: options.endTime,
       metadata,
-    });
+    };
+    if (options.recurrence) body.recurrence = options.recurrence;
+
+    const result = await this.request("POST", "/calendar-events", body);
 
     if (result.status !== 200) {
       return { success: false, eventId: "", message: `Create event failed: ${JSON.stringify(result.data)}` };
@@ -679,6 +683,63 @@ export class SkoolApi {
 
     const eventId = (result.data.id as string) || "";
     return { success: true, eventId, message: `Event "${options.title}" created. ID: ${eventId}` };
+  }
+
+  /**
+   * Edit a calendar event.
+   */
+  async editEvent(
+    eventId: string,
+    options: {
+      groupId: string;
+      title?: string;
+      description?: string;
+      startTime?: string;
+      endTime?: string;
+      timezone?: string;
+      coverImage?: string;
+      recurrence?: { frequency: string; interval: number; days: number[] };
+    }
+  ): Promise<{ success: boolean; message: string }> {
+    // First get the current event data
+    const current = await this.request("GET", `/calendar-events/${eventId}`);
+    if (current.status !== 200) {
+      return { success: false, message: `Could not fetch event: ${JSON.stringify(current.data)}` };
+    }
+
+    const currentMeta = (current.data.metadata as Record<string, unknown>) || {};
+    const metadata: Record<string, unknown> = {
+      title: options.title || currentMeta.title,
+      description: options.description !== undefined ? options.description : (currentMeta.description || ""),
+      timezone: options.timezone || currentMeta.timezone || "America/New_York",
+      reminder_disabled: currentMeta.reminder_disabled ?? 0,
+      location: currentMeta.location || JSON.stringify({ location_type: 5, location_info: "" }),
+      privacy: currentMeta.privacy || JSON.stringify({ privacy_type: 0 }),
+      cover_image: options.coverImage || currentMeta.cover_image || "",
+    };
+
+    const body: Record<string, unknown> = {
+      group_id: options.groupId,
+      start_time: options.startTime || current.data.start_time || current.data.startTime,
+      end_time: options.endTime || current.data.end_time || current.data.endTime,
+      metadata,
+      id: eventId,
+    };
+
+    // Use new recurrence if provided, otherwise preserve original
+    if (options.recurrence) {
+      body.recurrence = options.recurrence;
+    } else if (current.data.recurrence) {
+      body.recurrence = current.data.recurrence;
+    }
+
+    const result = await this.request("PUT", `/calendar-events/${eventId}`, body);
+
+    if (result.status !== 200) {
+      return { success: false, message: `Edit event failed: ${JSON.stringify(result.data)}` };
+    }
+
+    return { success: true, message: `Event ${eventId} updated successfully` };
   }
 
   /**

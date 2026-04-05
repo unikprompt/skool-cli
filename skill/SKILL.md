@@ -136,6 +136,13 @@ npx skool-cli get-categories -g GROUP
 # Create an event
 npx skool-cli create-event -g GROUP -t "Weekly Q&A" --start "2026-04-10T14:00:00-04:00" --end "2026-04-10T15:00:00-04:00" -d "Open Q&A session"
 
+# Create recurring event (every Monday)
+npx skool-cli create-event -g GROUP -t "Weekly Q&A" --start "2026-04-07T20:00:00-04:00" --end "2026-04-07T21:00:00-04:00" --repeat "weekly:mon"
+
+# Edit an event
+npx skool-cli edit-event --id EVENT_ID -g GROUP --title "New Title" --description "Updated desc"
+npx skool-cli edit-event --id EVENT_ID -g GROUP --start "2026-04-10T15:00:00-04:00" --end "2026-04-10T16:00:00-04:00"
+
 # List events
 npx skool-cli list-events -g GROUP
 npx skool-cli list-events -g GROUP --json

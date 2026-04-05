@@ -897,6 +897,7 @@ export class SkoolClient {
     endTime: string;
     timezone?: string;
     coverImage?: string;
+    recurrence?: { frequency: string; interval: number; days: number[] };
   }): Promise<OperationResult> {
     try {
       const { groupId } = await this.discoverGroupIds(options.group);
@@ -918,11 +919,53 @@ export class SkoolClient {
         endTime: options.endTime,
         timezone: options.timezone,
         coverImage: coverUrl,
+        recurrence: options.recurrence,
       });
 
       return { success: result.success, message: result.message };
     } catch (error) {
       return { success: false, message: `Failed to create event: ${(error as Error).message}` };
+    }
+  }
+
+  /** Edit a calendar event */
+  async editEvent(options: {
+    id: string;
+    group: string;
+    title?: string;
+    description?: string;
+    startTime?: string;
+    endTime?: string;
+    timezone?: string;
+    coverImage?: string;
+    recurrence?: { frequency: string; interval: number; days: number[] };
+  }): Promise<OperationResult> {
+    try {
+      const { groupId } = await this.discoverGroupIds(options.group);
+      if (!groupId) {
+        return { success: false, message: "Could not discover group ID." };
+      }
+
+      let coverUrl: string | undefined;
+      if (options.coverImage) {
+        const upload = await this.api.uploadFile(options.coverImage, groupId);
+        if (upload) coverUrl = upload.readUrl;
+      }
+
+      const result = await this.api.editEvent(options.id, {
+        groupId,
+        title: options.title,
+        description: options.description,
+        startTime: options.startTime,
+        endTime: options.endTime,
+        timezone: options.timezone,
+        coverImage: coverUrl,
+        recurrence: options.recurrence,
+      });
+
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      return { success: false, message: `Failed to edit event: ${(error as Error).message}` };
     }
   }
 
