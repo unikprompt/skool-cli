@@ -96,6 +96,39 @@ skool list-lessons -g my-community --json
 skool create-folder -g my-community --course "Course" -t "Module Name"
 ```
 
+### Calendar Events
+
+```bash
+# Create a one-time event
+skool create-event -g my-community -t "Workshop" \
+  --start "2026-04-10T14:00:00-04:00" --end "2026-04-10T15:00:00-04:00" \
+  -d "Description" --cover cover.jpg
+
+# Create a recurring event (every Monday)
+skool create-event -g my-community -t "Weekly Q&A" \
+  --start "2026-04-07T20:00:00-04:00" --end "2026-04-07T21:00:00-04:00" \
+  --repeat "weekly:mon"
+# Repeat options: weekly:mon,wed | daily | biweekly:fri
+
+# Edit an event (preserves recurrence unless --repeat is specified)
+skool edit-event --id EVENT_ID -g my-community --title "New Title"
+skool edit-event --id EVENT_ID -g my-community --repeat "weekly:tue"
+
+# List events
+skool list-events -g my-community --json
+
+# Delete an event
+skool delete-event --id EVENT_ID
+```
+
+### Leaderboard
+
+```bash
+skool get-leaderboard -g my-community
+skool get-leaderboard -g my-community --period 30d --json
+# Periods: all (default), 30d, 7d
+```
+
 ### Community Posts
 
 ```bash
@@ -181,6 +214,20 @@ await client.moveLesson({
   group: 'my-community',
   course: 'My Course',
 });
+
+// Calendar events
+await client.createEvent({
+  group: 'my-community',
+  title: 'Weekly Q&A',
+  startTime: '2026-04-07T20:00:00-04:00',
+  endTime: '2026-04-07T21:00:00-04:00',
+  recurrence: { frequency: 'weekly', interval: 1, days: [1] },
+});
+await client.editEvent({ id: 'event-id', group: 'my-community', title: 'Updated' });
+await client.deleteEvent('event-id');
+
+// Leaderboard
+const { users, levels } = await client.getLeaderboard('my-community', '30d');
 
 // Community posts
 await client.createPost({ group: 'my-community', title: 'Hello!', body: 'Post body' });
