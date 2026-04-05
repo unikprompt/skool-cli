@@ -645,6 +645,36 @@ export class SkoolApi {
   }
 
   /**
+   * Update an existing post's title, content, or category.
+   */
+  async updatePost(
+    postId: string,
+    options: { title?: string; content?: string; labels?: string }
+  ): Promise<{ success: boolean; message: string }> {
+    const body: Record<string, unknown> = {};
+    if (options.title) body.title = options.title;
+    if (options.content) body.content = options.content;
+    if (options.labels) body.labels = options.labels;
+
+    const result = await this.request("POST", `/posts/${postId}/update`, body);
+    if (result.status !== 200) {
+      return { success: false, message: `Update post failed: ${JSON.stringify(result.data)}` };
+    }
+    return { success: true, message: `Post ${postId} updated successfully` };
+  }
+
+  /**
+   * Delete a post by ID.
+   */
+  async deletePost(postId: string): Promise<{ success: boolean; message: string }> {
+    const result = await this.request("DELETE", `/posts/${postId}`);
+    if (result.status !== 200 && result.status !== 204) {
+      return { success: false, message: `Delete post failed: ${JSON.stringify(result.data)}` };
+    }
+    return { success: true, message: `Post ${postId} deleted successfully` };
+  }
+
+  /**
    * Delete a page by ID.
    */
   async deletePage(pageId: string): Promise<boolean> {

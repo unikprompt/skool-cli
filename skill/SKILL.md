@@ -113,11 +113,18 @@ npx skool-cli create-post -g GROUP -t "POST TITLE" -b "Post body text" -c "CATEG
 # Create post from file
 npx skool-cli create-post -g GROUP -t "POST TITLE" --file post.txt -c "General"
 
-# List posts
+# Edit a post
+npx skool-cli edit-post --id POST_ID --title "New Title" --body "Updated body"
+npx skool-cli edit-post --id POST_ID --category CATEGORY_ID
+
+# Delete a post
+npx skool-cli delete-post --id POST_ID
+
+# List posts (to get IDs)
 npx skool-cli get-posts -g GROUP
 npx skool-cli get-posts -g GROUP --json
 
-# List categories
+# List categories (to get category IDs)
 npx skool-cli get-categories -g GROUP
 ```
 

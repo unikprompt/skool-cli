@@ -12,6 +12,8 @@ import { deleteCourseCommand } from "./commands/delete-course.js";
 import { createLessonCommand } from "./commands/create-lesson.js";
 import { createFolderCommand } from "./commands/create-folder.js";
 import { createPostCommand } from "./commands/create-post.js";
+import { editPostCommand } from "./commands/edit-post.js";
+import { deletePostCommand } from "./commands/delete-post.js";
 import { getPostsCommand } from "./commands/get-posts.js";
 import { getCategoriesCommand } from "./commands/get-categories.js";
 import { getMembersCommand } from "./commands/get-members.js";
@@ -49,6 +51,8 @@ program.addCommand(listLessonsCommand);
 
 // Community
 program.addCommand(createPostCommand);
+program.addCommand(editPostCommand);
+program.addCommand(deletePostCommand);
 program.addCommand(getPostsCommand);
 program.addCommand(getCategoriesCommand);
 

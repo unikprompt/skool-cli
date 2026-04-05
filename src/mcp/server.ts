@@ -320,6 +320,42 @@ server.tool(
 );
 
 server.tool(
+  "skool_edit_post",
+  "Edit an existing community post",
+  {
+    id: z.string().describe("Post ID to edit"),
+    title: z.string().optional().describe("New title"),
+    body: z.string().optional().describe("New body text"),
+    category: z.string().optional().describe("Category ID"),
+  },
+  async (args) => {
+    const result = await client.editPost({
+      id: args.id,
+      title: args.title,
+      body: args.body,
+      category: args.category,
+    });
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
+  "skool_delete_post",
+  "Delete a community post by ID",
+  {
+    id: z.string().describe("Post ID to delete"),
+  },
+  async ({ id }) => {
+    const result = await client.deletePost(id);
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
   "skool_get_posts",
   "List community posts from a Skool group",
   {

@@ -849,6 +849,45 @@ export class SkoolClient {
   }
 
   /** Get posts from a community */
+  /** Edit an existing post */
+  async editPost(options: {
+    id: string;
+    title?: string;
+    body?: string;
+    category?: string;
+  }): Promise<OperationResult> {
+    if (!options.title && !options.body && !options.category) {
+      return { success: false, message: "Nothing to update. Provide --title, --body, or --category." };
+    }
+    try {
+      // If category name provided, resolve to ID
+      let labels: string | undefined;
+      if (options.category) {
+        // Category ID will need to be resolved - for now pass as-is
+        // Users can get category IDs from get-categories --json
+        labels = options.category;
+      }
+      const result = await this.api.updatePost(options.id, {
+        title: options.title,
+        content: options.body,
+        labels,
+      });
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      return { success: false, message: `Failed to edit post: ${(error as Error).message}` };
+    }
+  }
+
+  /** Delete a post by ID */
+  async deletePost(postId: string): Promise<OperationResult> {
+    try {
+      const result = await this.api.deletePost(postId);
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      return { success: false, message: `Failed to delete post: ${(error as Error).message}` };
+    }
+  }
+
   async getPosts(
     groupSlug: string
   ): Promise<{ success: boolean; posts: SkoolPost[] }> {
