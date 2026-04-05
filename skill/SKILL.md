@@ -194,6 +194,49 @@ npx skool-cli get-members -g GROUP --search "name"
 npx skool-cli get-members -g GROUP --json
 ```
 
+### User Profile
+
+```bash
+# Get your profile
+npx skool-cli get-profile
+npx skool-cli get-profile --json
+
+# Edit your profile
+npx skool-cli edit-profile --bio "New bio text"
+npx skool-cli edit-profile --location "Fort Myers, FL" --website "https://example.com"
+npx skool-cli edit-profile --twitter "https://x.com/user" --linkedin "https://linkedin.com/in/user"
+
+# List your communities
+npx skool-cli list-communities
+npx skool-cli list-communities --json
+```
+
+### Notifications
+
+```bash
+# Get notifications
+npx skool-cli get-notifications
+npx skool-cli get-notifications --json
+
+# Mark all as read
+npx skool-cli mark-notifications-read
+```
+
+### Chat
+
+```bash
+# List chat conversations
+npx skool-cli get-chats
+npx skool-cli get-chats --json
+
+# Read messages from a conversation
+npx skool-cli get-chat-messages --channel CHANNEL_ID
+npx skool-cli get-chat-messages --channel CHANNEL_ID --json
+
+# Send a message
+npx skool-cli send-chat-message --channel CHANNEL_ID -m "Your message here"
+```
+
 ## Content Format
 
 Lessons support full markdown:

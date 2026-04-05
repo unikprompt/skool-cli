@@ -912,6 +912,108 @@ export class SkoolApi {
     return result.status === 200 || result.status === 204;
   }
 
+  // ----------------------------------------------------------
+  // User / Profile
+  // ----------------------------------------------------------
+
+  /**
+   * Get the authenticated user's profile via GET /self.
+   */
+  async getSelf(): Promise<{ status: number; data: Record<string, unknown> }> {
+    return this.request("GET", "/self");
+  }
+
+  /**
+   * Get the authenticated user's communities via GET /self/groups.
+   */
+  async getSelfGroups(): Promise<{ status: number; data: Record<string, unknown> }> {
+    return this.request("GET", "/self/groups");
+  }
+
+  /**
+   * Update a single profile metadata field.
+   * Skool uses PUT /users/{userId}/metadata/{field} with plain-text body.
+   */
+  async updateProfileField(
+    userId: string,
+    field: string,
+    value: string
+  ): Promise<{ success: boolean; message: string }> {
+    const cookies = await this.getCookies();
+    const url = `${API_BASE}/users/${userId}/metadata/${field}`;
+
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Cookie: cookies,
+        "Content-Type": "text/plain",
+        Accept: "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        Origin: "https://www.skool.com",
+        Referer: "https://www.skool.com/",
+      },
+      body: value,
+    });
+
+    if (response.status !== 200) {
+      const text = await response.text();
+      return { success: false, message: `Update ${field} failed (${response.status}): ${text}` };
+    }
+    return { success: true, message: `${field} updated` };
+  }
+
+  /**
+   * Get user notifications.
+   */
+  async getNotifications(limit = 30): Promise<{ status: number; data: Record<string, unknown> }> {
+    return this.request("GET", `/self/notifications?type=all&limit=${limit}`);
+  }
+
+  /**
+   * Get chat channels (DM conversations).
+   */
+  async getChatChannels(): Promise<{ status: number; data: Record<string, unknown> }> {
+    return this.request("GET", "/self/chat-channels?offset=0&limit=30&last=true&unread-only=false");
+  }
+
+  /**
+   * Mark all notifications as read via POST /messages with cmd:"read".
+   * Skool uses separate categories, so we mark each one.
+   */
+  async markNotificationsRead(): Promise<{ success: boolean; message: string }> {
+    const categories = ["new_posts", "comments", "mentions", "following", "requests"];
+
+    for (const category of categories) {
+      const result = await this.request("POST", "/messages", {
+        cmd: "read",
+        all: true,
+        group_id: "",
+        category,
+      });
+
+      if (result.status !== 200) continue;
+
+      const waitToken = result.data.wait_token as string;
+      if (waitToken) {
+        await this.request("GET", `/wait?token=${waitToken}`);
+      }
+    }
+
+    return { success: true, message: "All notifications marked as read" };
+  }
+
+  /**
+   * Get messages from a chat channel.
+   * Uses cursor-based pagination with after param.
+   */
+  async getChatMessages(
+    channelId: string,
+    limit = 30
+  ): Promise<{ status: number; data: Record<string, unknown> }> {
+    return this.request("GET", `/channels/${channelId}/messages?after=00000000000000000000000000000001&limit=${limit}`);
+  }
+
   /**
    * Extract group_id, user_id, root_id from the classroom page.
    * These IDs are needed for API calls.

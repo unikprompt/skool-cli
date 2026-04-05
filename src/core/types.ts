@@ -85,6 +85,85 @@ export interface CreatePostOptions {
   category?: string;
 }
 
+/** Authenticated user's profile */
+export interface UserProfile {
+  id: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
+  bio: string;
+  location: string;
+  website: string;
+  photoUrl: string;
+  socialLinks: {
+    twitter: string;
+    instagram: string;
+    linkedin: string;
+    facebook: string;
+    youtube: string;
+  };
+  theme: string;
+  timezone: string;
+  createdAt: string;
+}
+
+/** Community the user belongs to */
+export interface UserCommunity {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  memberCount: number;
+  logoUrl: string;
+  color: string;
+  isOwner: boolean;
+}
+
+/** Options for editing user profile */
+export interface EditProfileOptions {
+  bio?: string;
+  location?: string;
+  website?: string;
+  twitter?: string;
+  instagram?: string;
+  linkedin?: string;
+  facebook?: string;
+  youtube?: string;
+}
+
+/** A notification from Skool */
+export interface SkoolNotification {
+  id: string;
+  action: string;
+  displayName: string;
+  text: string;
+  groupName: string;
+  link: string;
+  unread: boolean;
+  createdAt: string;
+}
+
+/** A chat channel (DM conversation) */
+export interface ChatChannel {
+  id: string;
+  userName: string;
+  userBio: string;
+  userPhotoUrl: string;
+  lastMessageAt: string;
+  unreadCount: number;
+  lastMessagePreview: string;
+}
+
+/** A chat message */
+export interface ChatMessage {
+  id: string;
+  content: string;
+  senderId: string;
+  receiverId: string;
+  createdAt: string;
+}
+
 /** Result of an operation */
 export interface OperationResult {
   success: boolean;

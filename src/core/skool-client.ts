@@ -10,9 +10,15 @@ import type {
   EditLessonOptions,
   CreateFolderOptions,
   CreatePostOptions,
+  EditProfileOptions,
   OperationResult,
   SkoolPost,
   SkoolMember,
+  SkoolNotification,
+  UserProfile,
+  UserCommunity,
+  ChatChannel,
+  ChatMessage,
 } from "./types.js";
 
 /**
@@ -1255,6 +1261,363 @@ export class SkoolClient {
   }
 
   // ----------------------------------------------------------
+  // User / Profile
+  // ----------------------------------------------------------
+
+  /** Get the authenticated user's userId from the JWT cookie */
+  private async getUserId(): Promise<string> {
+    if (this.cachedUserId) return this.cachedUserId;
+
+    const page = await this.browser.getPage();
+    // Ensure we have a page loaded to access cookies
+    if (page.url() === "about:blank") {
+      await page.goto("https://www.skool.com", { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(2000);
+    }
+
+    const cookies = await page.context().cookies();
+    const authCookie = cookies.find((c) => c.name === "auth_token");
+    if (authCookie) {
+      try {
+        const payload = JSON.parse(
+          Buffer.from(authCookie.value.split(".")[1], "base64").toString()
+        );
+        this.cachedUserId = payload.user_id || payload.sub || payload.id || "";
+      } catch { /* ignore */ }
+    }
+    return this.cachedUserId;
+  }
+
+  /** Get the authenticated user's profile */
+  async getProfile(): Promise<{ success: boolean; message: string; profile: UserProfile | null }> {
+    try {
+      const result = await this.api.getSelf();
+      if (result.status !== 200) {
+        return { success: false, message: `Failed to get profile: ${JSON.stringify(result.data)}`, profile: null };
+      }
+
+      const d = result.data;
+      const meta = (d.metadata || {}) as Record<string, unknown>;
+
+      const profile: UserProfile = {
+        id: String(d.id || ""),
+        firstName: String(d.first_name || ""),
+        lastName: String(d.last_name || ""),
+        username: String(d.name || ""),
+        email: String(d.email || ""),
+        bio: String(meta.bio || ""),
+        location: String(meta.location || ""),
+        website: String(meta.link_website || ""),
+        photoUrl: String(meta.picture_profile || ""),
+        socialLinks: {
+          twitter: String(meta.link_twitter || ""),
+          instagram: String(meta.link_instagram || ""),
+          linkedin: String(meta.link_linkedin || ""),
+          facebook: String(meta.link_facebook || ""),
+          youtube: String(meta.link_youtube || ""),
+        },
+        theme: String(meta.theme || ""),
+        timezone: String(meta.timezone || ""),
+        createdAt: String(d.created_at || ""),
+      };
+
+      return { success: true, message: "Profile retrieved", profile };
+    } catch (error) {
+      return { success: false, message: `Failed to get profile: ${(error as Error).message}`, profile: null };
+    }
+  }
+
+  /** List the authenticated user's communities */
+  async listCommunities(): Promise<{ success: boolean; message: string; communities: UserCommunity[] }> {
+    try {
+      const userId = await this.getUserId();
+      const result = await this.api.getSelfGroups();
+      if (result.status !== 200) {
+        return { success: false, message: `Failed to list communities: ${JSON.stringify(result.data)}`, communities: [] };
+      }
+
+      const groups = (result.data.groups || []) as Array<Record<string, unknown>>;
+      const communities: UserCommunity[] = groups.map((g) => {
+        const meta = (g.metadata || {}) as Record<string, unknown>;
+        return {
+          id: String(g.id || ""),
+          name: String(g.name || ""),
+          displayName: String(meta.display_name || g.name || ""),
+          description: String(meta.description || ""),
+          memberCount: Number(meta.member_count || 0),
+          logoUrl: String(meta.logo_url || ""),
+          color: String(meta.color || ""),
+          isOwner: String(meta.created_by || "") === userId,
+        };
+      });
+
+      return { success: true, message: `Found ${communities.length} communities`, communities };
+    } catch (error) {
+      return { success: false, message: `Failed to list communities: ${(error as Error).message}`, communities: [] };
+    }
+  }
+
+  /** Edit the authenticated user's profile */
+  async editProfile(options: EditProfileOptions): Promise<OperationResult> {
+    try {
+      const userId = await this.getUserId();
+      if (!userId) {
+        return { success: false, message: "Could not determine user ID. Are you logged in?" };
+      }
+
+      const fieldMap: Record<string, string> = {
+        bio: "bio",
+        location: "location",
+        website: "link_website",
+        twitter: "link_twitter",
+        instagram: "link_instagram",
+        linkedin: "link_linkedin",
+        facebook: "link_facebook",
+        youtube: "link_youtube",
+      };
+
+      const updates: string[] = [];
+      for (const [optKey, apiField] of Object.entries(fieldMap)) {
+        const value = options[optKey as keyof EditProfileOptions];
+        if (value !== undefined) {
+          const result = await this.api.updateProfileField(userId, apiField, value);
+          if (!result.success) {
+            return { success: false, message: result.message };
+          }
+          updates.push(optKey);
+        }
+      }
+
+      if (updates.length === 0) {
+        return { success: false, message: "No fields to update. Provide at least one option." };
+      }
+
+      return { success: true, message: `Profile updated: ${updates.join(", ")}` };
+    } catch (error) {
+      return { success: false, message: `Failed to edit profile: ${(error as Error).message}` };
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Notifications
+  // ----------------------------------------------------------
+
+  /** Get notifications */
+  async getNotifications(): Promise<{ success: boolean; message: string; notifications: SkoolNotification[] }> {
+    try {
+      const result = await this.api.getNotifications();
+      if (result.status !== 200) {
+        return { success: false, message: `Failed: ${JSON.stringify(result.data)}`, notifications: [] };
+      }
+
+      const messages = (result.data.messages || []) as Array<Record<string, unknown>>;
+      const notifications: SkoolNotification[] = messages.map((m) => {
+        const meta = (m.metadata || {}) as Record<string, unknown>;
+        let data: Record<string, unknown> = {};
+        try { data = JSON.parse(String(meta.data || "{}")); } catch { /* ignore */ }
+
+        return {
+          id: String(m.id || ""),
+          action: String(m.action || ""),
+          displayName: String(data.display_name || ""),
+          text: String(data.text || ""),
+          groupName: String(data.group_display_name || ""),
+          link: String(data.link_as || ""),
+          unread: Boolean(m.unread),
+          createdAt: String(m.created_at || ""),
+        };
+      });
+
+      return { success: true, message: `${notifications.length} notifications`, notifications };
+    } catch (error) {
+      return { success: false, message: `Failed: ${(error as Error).message}`, notifications: [] };
+    }
+  }
+
+  /** Get the first group slug for navigation */
+  private async getFirstGroupSlug(): Promise<string> {
+    const result = await this.api.getSelfGroups();
+    if (result.status === 200) {
+      const groups = (result.data.groups || []) as Array<Record<string, unknown>>;
+      if (groups.length > 0) return String(groups[0].name || "");
+    }
+    return "";
+  }
+
+  /** Navigate to a group page (needed for top-bar UI elements) */
+  private async navigateToGroup(): Promise<void> {
+    const page = await this.browser.getPage();
+    const slug = await this.getFirstGroupSlug();
+    if (!slug) throw new Error("No groups found. Are you logged in?");
+    await page.goto(`https://www.skool.com/${slug}`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(5000);
+  }
+
+  /** Click a top-bar icon button by position (0=chat, 1=bell, 2=avatar) */
+  private async clickTopBarButton(index: number): Promise<boolean> {
+    const page = await this.browser.getPage();
+    return page.evaluate((idx) => {
+      const buttons = Array.from(document.querySelectorAll("button"));
+      // Filter to top-right buttons with SVGs (chat and bell icons)
+      const topBarBtns = buttons
+        .filter((btn) => {
+          const rect = btn.getBoundingClientRect();
+          return rect.y > 0 && rect.y < 60 && rect.x > 950 && btn.querySelector("svg");
+        })
+        .sort((a, b) => a.getBoundingClientRect().x - b.getBoundingClientRect().x);
+
+      if (topBarBtns[idx]) {
+        topBarBtns[idx].click();
+        return true;
+      }
+      return false;
+    }, index);
+  }
+
+  /** Mark all notifications as read via API */
+  async markNotificationsRead(): Promise<OperationResult> {
+    try {
+      return await this.api.markNotificationsRead();
+    } catch (error) {
+      return { success: false, message: `Failed: ${(error as Error).message}` };
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Chat
+  // ----------------------------------------------------------
+
+  /** List chat channels (DM conversations) */
+  async getChats(): Promise<{ success: boolean; message: string; channels: ChatChannel[] }> {
+    try {
+      const result = await this.api.getChatChannels();
+      if (result.status !== 200) {
+        return { success: false, message: `Failed: ${JSON.stringify(result.data)}`, channels: [] };
+      }
+
+      const raw = (result.data.channels || []) as Array<Record<string, unknown>>;
+      const channels: ChatChannel[] = raw.map((ch) => {
+        const user = (ch.user || {}) as Record<string, unknown>;
+        const userMeta = (user.metadata || {}) as Record<string, unknown>;
+        const chMeta = (ch.metadata || {}) as Record<string, unknown>;
+
+        return {
+          id: String(ch.id || ""),
+          userName: `${String(user.name || "")}`,
+          userBio: String(userMeta.bio || "").split("\n")[0].slice(0, 80),
+          userPhotoUrl: String(userMeta.picture_bubble || ""),
+          lastMessageAt: String(ch.last_message_at || ""),
+          unreadCount: Number(chMeta.num_unread || 0),
+          lastMessagePreview: "",
+        };
+      });
+
+      return { success: true, message: `${channels.length} conversations`, channels };
+    } catch (error) {
+      return { success: false, message: `Failed: ${(error as Error).message}`, channels: [] };
+    }
+  }
+
+  /** Get messages from a chat channel */
+  async getChatMessages(
+    channelId: string
+  ): Promise<{ success: boolean; message: string; messages: ChatMessage[] }> {
+    try {
+      const result = await this.api.getChatMessages(channelId);
+      if (result.status !== 200) {
+        return { success: false, message: `Failed: ${JSON.stringify(result.data)}`, messages: [] };
+      }
+
+      const raw = (result.data.messages || []) as Array<Record<string, unknown>>;
+      const messages: ChatMessage[] = raw.map((m) => {
+        const meta = (m.metadata || {}) as Record<string, unknown>;
+        return {
+          id: String(m.id || ""),
+          content: String(meta.content || ""),
+          senderId: String(meta.src || ""),
+          receiverId: String(meta.dst || ""),
+          createdAt: String(m.created_at || ""),
+        };
+      });
+
+      return { success: true, message: `${messages.length} messages`, messages };
+    } catch (error) {
+      return { success: false, message: `Failed: ${(error as Error).message}`, messages: [] };
+    }
+  }
+
+  /** Send a chat message via Playwright UI automation */
+  async sendChatMessage(
+    channelId: string,
+    message: string
+  ): Promise<OperationResult> {
+    try {
+      // Get the target user's name from the channel
+      const chatsResult = await this.api.getChatChannels();
+      const channels = (chatsResult.data.channels || []) as Array<Record<string, unknown>>;
+      const targetChannel = channels.find((ch) => ch.id === channelId);
+      if (!targetChannel) {
+        return { success: false, message: `Channel ${channelId} not found` };
+      }
+
+      const user = (targetChannel.user || {}) as Record<string, unknown>;
+      const userName = String(user.name || "");
+      // Extract first part of slug name for search (e.g. "thomas" from "thomas-freund-8910")
+      const searchTerm = userName.split("-")[0];
+
+      await this.navigateToGroup();
+      const page = await this.browser.getPage();
+
+      // Open chat panel (index 0: first SVG button in top-right)
+      const chatClicked = await this.clickTopBarButton(0);
+      if (!chatClicked) {
+        return { success: false, message: "Could not find chat icon" };
+      }
+      await page.waitForTimeout(4000);
+
+      // Wait for chat panel to load, then click the conversation row
+      const convClicked = await page.evaluate((term) => {
+        const allEls = Array.from(document.querySelectorAll("div"));
+        for (const el of allEls) {
+          const text = (el.textContent || "").toLowerCase();
+          // Match the conversation row by user name and reasonable dimensions
+          if (text.includes(term.toLowerCase()) && !text.includes("search")) {
+            const rect = el.getBoundingClientRect();
+            const style = window.getComputedStyle(el);
+            if (rect.width > 100 && rect.height > 30 && rect.height < 80 && rect.x > 700 && style.cursor === "pointer") {
+              (el as HTMLElement).click();
+              return true;
+            }
+          }
+        }
+        return false;
+      }, searchTerm);
+
+      if (!convClicked) {
+        return { success: false, message: `Could not find conversation for "${searchTerm}" in chat panel` };
+      }
+      await page.waitForTimeout(4000);
+
+      // Find the chat textarea (Skool uses <textarea placeholder="Message {name}">)
+      const chatInput = page.locator('textarea[placeholder^="Message"]').first();
+      if (await chatInput.count() === 0) {
+        return { success: false, message: "Could not find chat message input" };
+      }
+
+      await chatInput.click();
+      await page.waitForTimeout(300);
+      await chatInput.fill(message);
+      await page.waitForTimeout(300);
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(3000);
+
+      return { success: true, message: "Message sent" };
+    } catch (error) {
+      return { success: false, message: `Failed: ${(error as Error).message}` };
+    }
+  }
+
+  // ----------------------------------------------------------
   // Lifecycle
   // ----------------------------------------------------------
 
@@ -1268,7 +1631,13 @@ export class SkoolClient {
 export type {
   CreateLessonOptions,
   CreatePostOptions,
+  EditProfileOptions,
   OperationResult,
   SkoolPost,
   SkoolMember,
+  SkoolNotification,
+  UserProfile,
+  UserCommunity,
+  ChatChannel,
+  ChatMessage,
 } from "./types.js";

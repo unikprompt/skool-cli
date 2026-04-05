@@ -538,6 +538,137 @@ server.tool(
 );
 
 // ----------------------------------------------------------
+// User / Profile tools
+// ----------------------------------------------------------
+
+server.tool(
+  "skool_get_profile",
+  "Get the authenticated user's Skool profile (name, bio, social links, etc.)",
+  {},
+  async () => {
+    const result = await client.getProfile();
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  "skool_edit_profile",
+  "Edit the authenticated user's Skool profile",
+  {
+    bio: z.string().optional().describe("Profile bio (max 150 chars)"),
+    location: z.string().optional().describe("Location"),
+    website: z.string().optional().describe("Website URL"),
+    twitter: z.string().optional().describe("Twitter/X URL"),
+    instagram: z.string().optional().describe("Instagram URL"),
+    linkedin: z.string().optional().describe("LinkedIn URL"),
+    facebook: z.string().optional().describe("Facebook URL"),
+    youtube: z.string().optional().describe("YouTube URL"),
+  },
+  async (args) => {
+    const result = await client.editProfile({
+      bio: args.bio,
+      location: args.location,
+      website: args.website,
+      twitter: args.twitter,
+      instagram: args.instagram,
+      linkedin: args.linkedin,
+      facebook: args.facebook,
+      youtube: args.youtube,
+    });
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
+  "skool_list_communities",
+  "List the authenticated user's Skool communities",
+  {},
+  async () => {
+    const result = await client.listCommunities();
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+// ----------------------------------------------------------
+// Notifications tools
+// ----------------------------------------------------------
+
+server.tool(
+  "skool_get_notifications",
+  "Get the authenticated user's Skool notifications",
+  {},
+  async () => {
+    const result = await client.getNotifications();
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  "skool_mark_notifications_read",
+  "Mark all Skool notifications as read (uses browser automation)",
+  {},
+  async () => {
+    const result = await client.markNotificationsRead();
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+// ----------------------------------------------------------
+// Chat tools
+// ----------------------------------------------------------
+
+server.tool(
+  "skool_get_chats",
+  "List the authenticated user's Skool chat conversations",
+  {},
+  async () => {
+    const result = await client.getChats();
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  "skool_get_chat_messages",
+  "Read messages from a Skool chat conversation",
+  {
+    channel_id: z.string().describe("Chat channel ID (get from skool_get_chats)"),
+  },
+  async ({ channel_id }) => {
+    const result = await client.getChatMessages(channel_id);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  "skool_send_chat_message",
+  "Send a message in a Skool chat conversation (uses browser automation)",
+  {
+    channel_id: z.string().describe("Chat channel ID"),
+    message: z.string().describe("Message text to send"),
+  },
+  async ({ channel_id, message }) => {
+    const result = await client.sendChatMessage(channel_id, message);
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+// ----------------------------------------------------------
 // Start server
 // ----------------------------------------------------------
 

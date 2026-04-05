@@ -77,4 +77,26 @@ program.addCommand(getAnalyticsCommand);
 import { editAboutCommand } from "./commands/edit-about.js";
 program.addCommand(editAboutCommand);
 
+// User / Profile
+import { getProfileCommand } from "./commands/get-profile.js";
+import { editProfileCommand } from "./commands/edit-profile.js";
+import { listCommunitiesCommand } from "./commands/list-communities.js";
+program.addCommand(getProfileCommand);
+program.addCommand(editProfileCommand);
+program.addCommand(listCommunitiesCommand);
+
+// Notifications
+import { getNotificationsCommand } from "./commands/get-notifications.js";
+import { markNotificationsReadCommand } from "./commands/mark-notifications-read.js";
+program.addCommand(getNotificationsCommand);
+program.addCommand(markNotificationsReadCommand);
+
+// Chat
+import { getChatsCommand } from "./commands/get-chats.js";
+import { getChatMessagesCommand } from "./commands/get-chat-messages.js";
+import { sendChatMessageCommand } from "./commands/send-chat-message.js";
+program.addCommand(getChatsCommand);
+program.addCommand(getChatMessagesCommand);
+program.addCommand(sendChatMessageCommand);
+
 program.parse();

@@ -1,6 +1,6 @@
 # skool-cli
 
-CLI, MCP Server, and programmatic API for [Skool.com](https://www.skool.com) automation. 27 commands covering courses, lessons, events, posts, members, analytics, and group settings.
+CLI, MCP Server, and programmatic API for [Skool.com](https://www.skool.com) automation. 35 commands covering courses, lessons, events, posts, members, analytics, group settings, user profile, notifications, and chat.
 
 **Skool has no public API.** This tool uses browser automation (Playwright) for auth and Skool's internal API for all content operations.
 
@@ -12,7 +12,7 @@ npx playwright install chromium
 skool login --email you@email.com --password yourpass
 ```
 
-## Commands (27)
+## Commands (35)
 
 ### Authentication
 
@@ -111,6 +111,42 @@ skool edit-about -g my-community --about "Landing page text (max 1000 chars)"
 skool edit-about -g my-community -n "New Group Name"
 ```
 
+### User Profile
+
+```bash
+# Get your profile (name, bio, social links, etc.)
+skool get-profile
+skool get-profile --json
+
+# Edit profile fields
+skool edit-profile --bio "New bio" --location "Fort Myers, FL"
+skool edit-profile --website "https://example.com" --twitter "https://x.com/user"
+
+# List your communities
+skool list-communities
+skool list-communities --json
+```
+
+### Notifications
+
+```bash
+skool get-notifications --json
+skool mark-notifications-read
+```
+
+### Chat
+
+```bash
+# List conversations
+skool get-chats --json
+
+# Read messages
+skool get-chat-messages --channel CHANNEL_ID --json
+
+# Send a message
+skool send-chat-message --channel CHANNEL_ID -m "Hey!"
+```
+
 ## Content Format
 
 Lessons support full markdown with auto-upload of local images:
@@ -169,6 +205,18 @@ const { users, levels } = await client.getLeaderboard('my-community', '30d');
 
 // Group settings
 await client.editAbout({ group: 'my-community', aboutDescription: 'Landing page text' });
+
+// User profile
+const { profile } = await client.getProfile();
+const { communities } = await client.listCommunities();
+await client.editProfile({ bio: 'New bio', location: 'City' });
+
+// Notifications & Chat
+const { notifications } = await client.getNotifications();
+await client.markNotificationsRead();
+const { channels } = await client.getChats();
+const { messages } = await client.getChatMessages(channels[0].id);
+await client.sendChatMessage(channels[0].id, 'Hello!');
 
 await client.close();
 ```
