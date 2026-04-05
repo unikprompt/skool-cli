@@ -7,6 +7,7 @@ export const createCourseCommand = new Command("create-course")
   .requiredOption("-t, --title <title>", "Course title (max 50 chars)")
   .option("-d, --description <text>", "Course description (max 500 chars)")
   .option("--privacy <type>", "Access type: open, level, buy, time, private", "open")
+  .option("--cover <path>", "Cover image file path (1460x752px recommended)")
   .action(async (opts) => {
     const client = new SkoolClient();
     try {
@@ -16,6 +17,7 @@ export const createCourseCommand = new Command("create-course")
         title: opts.title,
         description: opts.description,
         privacy: opts.privacy,
+        coverImage: opts.cover,
       });
       console.log(result.success ? `OK: ${result.message}` : `FAIL: ${result.message}`);
       process.exit(result.success ? 0 : 1);

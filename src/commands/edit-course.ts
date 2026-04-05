@@ -7,6 +7,8 @@ export const editCourseCommand = new Command("edit-course")
   .option("-t, --title <title>", "New title")
   .option("-d, --description <text>", "New description")
   .option("--privacy <type>", "Access type: open, level, buy, time, private")
+  .option("--cover <path>", "Cover image file path (1460x752px recommended)")
+  .option("-g, --group <slug>", "Skool group slug (required with --cover)", process.env.SKOOL_GROUP)
   .action(async (opts) => {
     const client = new SkoolClient();
     try {
@@ -15,6 +17,8 @@ export const editCourseCommand = new Command("edit-course")
         title: opts.title,
         description: opts.description,
         privacy: opts.privacy,
+        coverImage: opts.cover,
+        group: opts.group,
       });
       console.log(result.success ? `OK: ${result.message}` : `FAIL: ${result.message}`);
       process.exit(result.success ? 0 : 1);

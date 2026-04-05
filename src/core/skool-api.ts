@@ -239,6 +239,78 @@ export class SkoolApi {
   }
 
   /**
+   * Upload a file to Skool's storage (S3 via presigned URL).
+   * Returns the file ID and the public read URL.
+   */
+  async uploadFile(
+    filePath: string,
+    groupId: string
+  ): Promise<{ fileId: string; readUrl: string } | null> {
+    const { readFileSync } = await import("node:fs");
+    const { basename, extname } = await import("node:path");
+
+    const fileBuffer = readFileSync(filePath);
+    const fileName = basename(filePath);
+    const ext = extname(filePath).toLowerCase();
+    const contentTypeMap: Record<string, string> = {
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".png": "image/png",
+      ".gif": "image/gif",
+      ".webp": "image/webp",
+    };
+    const contentType = contentTypeMap[ext] || "application/octet-stream";
+
+    // Step 1: Register file and get presigned upload URL
+    const registerResult = await this.request("POST", "/files", {
+      file_name: fileName,
+      content_type: contentType,
+      content_length: fileBuffer.length,
+      content_disposition: "",
+      ref: "",
+      owner_id: groupId,
+      large_thumbnail: false,
+    });
+
+    if (registerResult.status !== 200 || !registerResult.data.write_url) {
+      return null;
+    }
+
+    const fileId = (registerResult.data.file as Record<string, unknown>)?.id as string;
+    const writeUrl = registerResult.data.write_url as string;
+    const waitToken = registerResult.data.wait_token as string;
+
+    // Step 2: Upload binary to S3 presigned URL
+    await fetch(writeUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": contentType,
+        "x-amz-acl": "public-read",
+      },
+      body: fileBuffer,
+    });
+
+    // Step 3: Wait for processing
+    for (let i = 0; i < 10; i++) {
+      const waitResult = await this.request("GET", `/wait?token=${waitToken}`);
+      const waitData = JSON.stringify(waitResult.data);
+      if (!waitData.includes("in-progress")) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+
+    // Step 4: Get processed file info
+    const fileResult = await this.request("GET", `/files?ids=${fileId}`);
+    const files = fileResult.data.files as Record<string, unknown>[] | undefined;
+    if (files && files.length > 0) {
+      const meta = files[0].metadata as Record<string, unknown>;
+      const readUrl = (meta?.read_url as string) || "";
+      return { fileId, readUrl };
+    }
+
+    return { fileId, readUrl: "" };
+  }
+
+  /**
    * Create a new course in a group.
    */
   async createCourse(options: {
@@ -247,8 +319,19 @@ export class SkoolApi {
     title: string;
     description?: string;
     privacy?: number;
+    coverImage?: string;
+    coverImageFile?: string;
   }): Promise<{ success: boolean; courseId: string; message: string }> {
-    const { groupId, userId, title, description, privacy } = options;
+    const { groupId, userId, title, description, privacy, coverImage, coverImageFile } = options;
+
+    const metadata: Record<string, unknown> = {
+      title,
+      desc: description || "",
+      privacy: privacy ?? 0,
+      min_tier: 0,
+    };
+    if (coverImage) metadata.cover_image = coverImage;
+    if (coverImageFile) metadata.cover_image_file = coverImageFile;
 
     const result = await this.request("POST", "/courses", {
       group_id: groupId,
@@ -256,12 +339,7 @@ export class SkoolApi {
       unit_type: "course",
       state: 2,
       is_afl_comp_eligible: false,
-      metadata: {
-        title,
-        desc: description || "",
-        privacy: privacy ?? 0,
-        min_tier: 0,
-      },
+      metadata,
     });
 
     if (result.status !== 200) {

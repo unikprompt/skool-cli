@@ -62,6 +62,7 @@ server.tool(
     title: z.string().describe("Course title (max 50 chars)"),
     description: z.string().optional().describe("Course description (max 500 chars)"),
     privacy: z.enum(["open", "level", "buy", "time", "private"]).optional().describe("Access type (default: open)"),
+    cover_image: z.string().optional().describe("Local file path for cover image"),
   },
   async (args) => {
     const result = await client.createCourse({
@@ -69,6 +70,7 @@ server.tool(
       title: args.title,
       description: args.description,
       privacy: args.privacy,
+      coverImage: args.cover_image,
     });
     return {
       content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
@@ -98,6 +100,8 @@ server.tool(
     title: z.string().optional().describe("New title"),
     description: z.string().optional().describe("New description"),
     privacy: z.enum(["open", "level", "buy", "time", "private"]).optional().describe("Access type"),
+    cover_image: z.string().optional().describe("Local file path for cover image"),
+    group: z.string().optional().describe("Skool group slug (required with cover_image)"),
   },
   async (args) => {
     const result = await client.editCourse({
@@ -105,6 +109,8 @@ server.tool(
       title: args.title,
       description: args.description,
       privacy: args.privacy,
+      coverImage: args.cover_image,
+      group: args.group,
     });
     return {
       content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],

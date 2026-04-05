@@ -67,6 +67,7 @@ export interface CreateCourseOptions {
   title: string;
   description?: string;
   privacy?: "open" | "level" | "buy" | "time" | "private";
+  coverImage?: string;
 }
 
 /** Options for creating a folder */

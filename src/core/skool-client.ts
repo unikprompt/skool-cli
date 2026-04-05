@@ -249,12 +249,25 @@ export class SkoolClient {
         return { success: false, message: "Could not discover Skool IDs." };
       }
 
+      // Upload cover image if provided
+      let coverImage: string | undefined;
+      let coverImageFile: string | undefined;
+      if (options.coverImage) {
+        const upload = await this.api.uploadFile(options.coverImage, groupId);
+        if (upload) {
+          coverImage = upload.readUrl;
+          coverImageFile = upload.fileId;
+        }
+      }
+
       const result = await this.api.createCourse({
         groupId,
         userId,
         title: options.title,
         description: options.description,
         privacy: privacyMap[options.privacy || "open"] ?? 0,
+        coverImage,
+        coverImageFile,
       });
 
       return { success: result.success, message: result.message };
@@ -308,19 +321,21 @@ export class SkoolClient {
     }
   }
 
-  /** Edit a course's title, description, or privacy */
+  /** Edit a course's title, description, privacy, or cover image */
   async editCourse(options: {
     id: string;
     title?: string;
     description?: string;
     privacy?: "open" | "level" | "buy" | "time" | "private";
+    coverImage?: string;
+    group?: string;
   }): Promise<OperationResult> {
     const privacyMap: Record<string, number> = {
       open: 0, level: 1, buy: 2, time: 3, private: 4,
     };
 
-    if (!options.title && !options.description && !options.privacy) {
-      return { success: false, message: "Nothing to update. Provide --title, --description, or --privacy." };
+    if (!options.title && !options.description && !options.privacy && !options.coverImage) {
+      return { success: false, message: "Nothing to update. Provide --title, --description, --privacy, or --cover." };
     }
 
     try {
@@ -329,7 +344,21 @@ export class SkoolClient {
       if (options.description !== undefined) body.desc = options.description;
       if (options.privacy) body.privacy = privacyMap[options.privacy] ?? 0;
 
-      // Wrap in metadata for course updates
+      if (options.coverImage) {
+        let groupId = this.cachedGroupId;
+        if (!groupId && options.group) {
+          const ids = await this.discoverGroupIds(options.group);
+          groupId = ids.groupId;
+        }
+        if (groupId) {
+          const upload = await this.api.uploadFile(options.coverImage, groupId);
+          if (upload) {
+            body.cover_image = upload.readUrl;
+            body.cover_image_file = upload.fileId;
+          }
+        }
+      }
+
       const result = await this.api.updateCourse(options.id, body);
       return { success: result.success, message: result.message };
     } catch (error) {
