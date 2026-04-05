@@ -99,7 +99,16 @@ skool create-folder -g my-community --course "Course" -t "Module Name"
 ### Community Posts
 
 ```bash
+# Create a post
 skool create-post -g my-community -t "Title" -b "Body text" -c "General"
+
+# Edit a post
+skool edit-post --id POST_ID --title "Updated Title" --body "New body"
+
+# Delete a post
+skool delete-post --id POST_ID
+
+# List posts and categories
 skool get-posts -g my-community --json
 skool get-categories -g my-community
 ```
@@ -173,8 +182,10 @@ await client.moveLesson({
   course: 'My Course',
 });
 
-// Community
+// Community posts
 await client.createPost({ group: 'my-community', title: 'Hello!', body: 'Post body' });
+await client.editPost({ id: 'post-id', title: 'Updated', body: 'New body' });
+await client.deletePost('post-id');
 const { posts } = await client.getPosts('my-community');
 const { members } = await client.getMembers('my-community');
 
