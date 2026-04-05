@@ -151,6 +151,19 @@ npx skool-cli list-events -g GROUP --json
 npx skool-cli delete-event --id EVENT_ID
 ```
 
+### Group Settings
+
+```bash
+# Edit group description (Settings > General)
+npx skool-cli edit-about -g GROUP -d "New description for the group"
+
+# Edit About page landing description (visible to visitors)
+npx skool-cli edit-about -g GROUP --about "Landing page description, max 1000 chars"
+
+# Edit group display name
+npx skool-cli edit-about -g GROUP -n "New Group Name"
+```
+
 ### Analytics
 
 ```bash

@@ -787,6 +787,38 @@ export class SkoolApi {
   }
 
   /**
+   * Update group settings (description, name, privacy, etc.)
+   */
+  async updateGroup(
+    groupId: string,
+    settings: Record<string, unknown>
+  ): Promise<{ success: boolean; message: string }> {
+    const result = await this.request("PUT", `/groups/${groupId}`, settings);
+    if (result.status !== 200) {
+      return { success: false, message: `Update group failed: ${JSON.stringify(result.data)}` };
+    }
+    return { success: true, message: "Group updated successfully" };
+  }
+
+  /**
+   * Update the landing page (About) description.
+   */
+  async updateLandingPageDescription(
+    groupId: string,
+    description: string
+  ): Promise<{ success: boolean; message: string }> {
+    const result = await this.request(
+      "POST",
+      `/groups/${groupId}/update-landing-page-description`,
+      { description }
+    );
+    if (result.status !== 200) {
+      return { success: false, message: `Update failed: ${JSON.stringify(result.data)}` };
+    }
+    return { success: true, message: "About description updated successfully" };
+  }
+
+  /**
    * Get group analytics (overview, growth, metrics).
    */
   async getAnalytics(

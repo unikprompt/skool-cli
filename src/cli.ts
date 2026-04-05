@@ -73,4 +73,8 @@ program.addCommand(getMembersCommand);
 program.addCommand(getLeaderboardCommand);
 program.addCommand(getAnalyticsCommand);
 
+// Group
+import { editAboutCommand } from "./commands/edit-about.js";
+program.addCommand(editAboutCommand);
+
 program.parse();

@@ -444,6 +444,28 @@ server.tool(
 );
 
 server.tool(
+  "skool_edit_about",
+  "Edit group description and display name",
+  {
+    group: z.string().describe("Skool group slug"),
+    description: z.string().optional().describe("Group description (Settings > General)"),
+    about_description: z.string().optional().describe("Landing page description (About page)"),
+    name: z.string().optional().describe("New display name"),
+  },
+  async (args) => {
+    const result = await client.editAbout({
+      group: args.group,
+      description: args.description,
+      aboutDescription: args.about_description,
+      name: args.name,
+    });
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
   "skool_get_analytics",
   "Get group analytics (members, visitors, signups, conversion, MRR)",
   {

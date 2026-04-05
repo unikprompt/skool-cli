@@ -1042,6 +1042,46 @@ export class SkoolClient {
     }
   }
 
+  /** Update group settings and/or landing page description */
+  async editAbout(options: {
+    group: string;
+    description?: string;
+    aboutDescription?: string;
+    name?: string;
+  }): Promise<OperationResult> {
+    if (!options.description && !options.aboutDescription && !options.name) {
+      return { success: false, message: "Nothing to update. Provide --description, --about, or --name." };
+    }
+
+    try {
+      const { groupId } = await this.discoverGroupIds(options.group);
+      if (!groupId) {
+        return { success: false, message: "Could not discover group ID." };
+      }
+
+      const results: string[] = [];
+
+      // Update Settings > General description and/or name
+      if (options.description || options.name) {
+        const settings: Record<string, unknown> = {};
+        if (options.description) settings.description = options.description;
+        if (options.name) settings.display_name = options.name;
+        const r = await this.api.updateGroup(groupId, settings);
+        results.push(r.success ? "Settings updated" : `Settings failed: ${r.message}`);
+      }
+
+      // Update About page landing description
+      if (options.aboutDescription) {
+        const r = await this.api.updateLandingPageDescription(groupId, options.aboutDescription);
+        results.push(r.success ? "About page updated" : `About failed: ${r.message}`);
+      }
+
+      return { success: true, message: results.join(". ") };
+    } catch (error) {
+      return { success: false, message: `Failed to edit about: ${(error as Error).message}` };
+    }
+  }
+
   /** Get group analytics */
   async getAnalytics(groupSlug: string): Promise<{
     success: boolean;
