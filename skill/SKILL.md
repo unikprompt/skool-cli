@@ -130,6 +130,20 @@ npx skool-cli get-categories -g GROUP
 
 ### Members
 
+### Calendar Events
+
+```bash
+# Create an event
+npx skool-cli create-event -g GROUP -t "Weekly Q&A" --start "2026-04-10T14:00:00-04:00" --end "2026-04-10T15:00:00-04:00" -d "Open Q&A session"
+
+# List events
+npx skool-cli list-events -g GROUP
+npx skool-cli list-events -g GROUP --json
+
+# Delete an event
+npx skool-cli delete-event --id EVENT_ID
+```
+
 ### Leaderboard
 
 ```bash

@@ -355,6 +355,66 @@ server.tool(
   }
 );
 
+// ----------------------------------------------------------
+// Calendar tools
+// ----------------------------------------------------------
+
+server.tool(
+  "skool_create_event",
+  "Create a calendar event",
+  {
+    group: z.string().describe("Skool group slug"),
+    title: z.string().describe("Event title"),
+    start_time: z.string().describe("Start time ISO 8601 (e.g. 2026-04-10T14:00:00-04:00)"),
+    end_time: z.string().describe("End time ISO 8601 (e.g. 2026-04-10T15:00:00-04:00)"),
+    description: z.string().optional().describe("Event description"),
+    timezone: z.string().optional().describe("Timezone (default: America/New_York)"),
+    cover_image: z.string().optional().describe("Local file path for cover image"),
+  },
+  async (args) => {
+    const result = await client.createEvent({
+      group: args.group,
+      title: args.title,
+      startTime: args.start_time,
+      endTime: args.end_time,
+      description: args.description,
+      timezone: args.timezone,
+      coverImage: args.cover_image,
+    });
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
+  "skool_list_events",
+  "List calendar events",
+  {
+    group: z.string().describe("Skool group slug"),
+  },
+  async ({ group }) => {
+    const result = await client.listEvents(group);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  "skool_delete_event",
+  "Delete a calendar event",
+  {
+    id: z.string().describe("Event ID to delete"),
+  },
+  async ({ id }) => {
+    const result = await client.deleteEvent(id);
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
 server.tool(
   "skool_get_leaderboard",
   "Get community leaderboard rankings",

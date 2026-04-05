@@ -645,6 +645,54 @@ export class SkoolApi {
   }
 
   /**
+   * Create a calendar event.
+   */
+  async createEvent(options: {
+    groupId: string;
+    title: string;
+    description?: string;
+    startTime: string;
+    endTime: string;
+    timezone?: string;
+    coverImage?: string;
+  }): Promise<{ success: boolean; eventId: string; message: string }> {
+    const metadata: Record<string, unknown> = {
+      title: options.title,
+      description: options.description || "",
+      timezone: options.timezone || "America/New_York",
+      reminder_disabled: 0,
+      location: JSON.stringify({ location_type: 5, location_info: "" }),
+      privacy: JSON.stringify({ privacy_type: 0 }),
+    };
+    if (options.coverImage) metadata.cover_image = options.coverImage;
+
+    const result = await this.request("POST", "/calendar-events", {
+      group_id: options.groupId,
+      start_time: options.startTime,
+      end_time: options.endTime,
+      metadata,
+    });
+
+    if (result.status !== 200) {
+      return { success: false, eventId: "", message: `Create event failed: ${JSON.stringify(result.data)}` };
+    }
+
+    const eventId = (result.data.id as string) || "";
+    return { success: true, eventId, message: `Event "${options.title}" created. ID: ${eventId}` };
+  }
+
+  /**
+   * Delete a calendar event.
+   */
+  async deleteEvent(eventId: string): Promise<{ success: boolean; message: string }> {
+    const result = await this.request("DELETE", `/calendar-events/${eventId}`);
+    if (result.status !== 200 && result.status !== 204) {
+      return { success: false, message: `Delete event failed: ${JSON.stringify(result.data)}` };
+    }
+    return { success: true, message: `Event ${eventId} deleted successfully` };
+  }
+
+  /**
    * Update an existing post's title, content, or category.
    */
   async updatePost(

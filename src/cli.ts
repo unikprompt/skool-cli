@@ -50,6 +50,14 @@ program.addCommand(moveLessonCommand);
 program.addCommand(deleteLessonCommand);
 program.addCommand(listLessonsCommand);
 
+// Calendar
+import { createEventCommand } from "./commands/create-event.js";
+import { listEventsCommand } from "./commands/list-events.js";
+import { deleteEventCommand } from "./commands/delete-event.js";
+program.addCommand(createEventCommand);
+program.addCommand(listEventsCommand);
+program.addCommand(deleteEventCommand);
+
 // Community
 program.addCommand(createPostCommand);
 program.addCommand(editPostCommand);

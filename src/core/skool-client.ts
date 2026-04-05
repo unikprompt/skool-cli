@@ -888,6 +888,88 @@ export class SkoolClient {
     }
   }
 
+  /** Create a calendar event */
+  async createEvent(options: {
+    group: string;
+    title: string;
+    description?: string;
+    startTime: string;
+    endTime: string;
+    timezone?: string;
+    coverImage?: string;
+  }): Promise<OperationResult> {
+    try {
+      const { groupId } = await this.discoverGroupIds(options.group);
+      if (!groupId) {
+        return { success: false, message: "Could not discover group ID." };
+      }
+
+      let coverUrl: string | undefined;
+      if (options.coverImage) {
+        const upload = await this.api.uploadFile(options.coverImage, groupId);
+        if (upload) coverUrl = upload.readUrl;
+      }
+
+      const result = await this.api.createEvent({
+        groupId,
+        title: options.title,
+        description: options.description,
+        startTime: options.startTime,
+        endTime: options.endTime,
+        timezone: options.timezone,
+        coverImage: coverUrl,
+      });
+
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      return { success: false, message: `Failed to create event: ${(error as Error).message}` };
+    }
+  }
+
+  /** List calendar events */
+  async listEvents(groupSlug: string): Promise<{
+    success: boolean;
+    message: string;
+    events: { id: string; title: string; startTime: string; endTime: string }[];
+  }> {
+    try {
+      const page = await this.browser.getPage();
+      await page.goto(`https://www.skool.com/${groupSlug}/calendar`);
+      await page.waitForTimeout(3000);
+
+      const events = await page.evaluate(() => {
+        const script = document.querySelector("script#__NEXT_DATA__");
+        if (!script) return [];
+        const d = JSON.parse(script.textContent || "{}");
+        const evts = d?.props?.pageProps?.events || [];
+        return evts.map((e: Record<string, unknown>) => ({
+          id: (e.id as string) || "",
+          title: ((e.metadata as Record<string, unknown>)?.title as string) || "",
+          startTime: (e.startTime as string) || (e.start_time as string) || "",
+          endTime: (e.endTime as string) || (e.end_time as string) || "",
+        }));
+      });
+
+      return {
+        success: true,
+        message: `${events.length} event(s) found`,
+        events,
+      };
+    } catch (error) {
+      return { success: false, message: `Failed to list events: ${(error as Error).message}`, events: [] };
+    }
+  }
+
+  /** Delete a calendar event */
+  async deleteEvent(eventId: string): Promise<OperationResult> {
+    try {
+      const result = await this.api.deleteEvent(eventId);
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      return { success: false, message: `Failed to delete event: ${(error as Error).message}` };
+    }
+  }
+
   /** Get leaderboard rankings */
   async getLeaderboard(
     groupSlug: string,
