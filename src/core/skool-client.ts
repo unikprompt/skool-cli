@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { BrowserManager } from "./browser-manager.js";
 import { PageOps } from "./page-ops.js";
 import { SkoolApi } from "./skool-api.js";
@@ -230,6 +231,36 @@ export class SkoolClient {
     this.lastGroupSlug = groupSlug;
 
     return { groupId, userId };
+  }
+
+  /**
+   * Scan HTML for local image paths and upload them to Skool.
+   * Replaces local paths with Skool CDN URLs.
+   */
+  private async uploadLocalImages(
+    html: string,
+    groupId: string
+  ): Promise<string> {
+    const imgRegex = /<img\s+[^>]*src="([^"]+)"[^>]*>/gi;
+    let result = html;
+    let match;
+
+    while ((match = imgRegex.exec(html)) !== null) {
+      const src = match[1];
+      // Skip URLs (http/https/data)
+      if (src.startsWith("http") || src.startsWith("data:")) continue;
+
+      // Resolve local path
+      const localPath = resolve(src);
+      if (!existsSync(localPath)) continue;
+
+      const upload = await this.api.uploadFile(localPath, groupId);
+      if (upload && upload.readUrl) {
+        result = result.replace(src, upload.readUrl);
+      }
+    }
+
+    return result;
   }
 
   /** Create a new course in a Skool group */
@@ -508,6 +539,9 @@ export class SkoolClient {
         parentId = folderId;
       }
 
+      // Upload local images if any
+      html = await this.uploadLocalImages(html, groupId);
+
       // Create lesson via direct API call
       const result = await this.api.createPage({
         groupId,
@@ -565,6 +599,11 @@ export class SkoolClient {
     }
 
     try {
+      // Upload local images if any
+      if (html && this.cachedGroupId) {
+        html = await this.uploadLocalImages(html, this.cachedGroupId);
+      }
+
       const result = await this.api.updatePage(options.id, {
         title: options.title,
         content: html,
