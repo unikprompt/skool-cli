@@ -32,9 +32,21 @@ skool whoami --group my-community
 # Create a new course
 skool create-course -g my-community -t "Course Name" -d "Description"
 
-# Create course with privacy setting
-skool create-course -g my-community -t "Premium Course" -d "Desc" --privacy level
+# Create course with cover image and privacy
+skool create-course -g my-community -t "Premium Course" -d "Desc" --privacy level --cover cover.jpg
 # Privacy options: open (default), level, buy, time, private
+
+# Edit a course
+skool edit-course --id COURSE_ID --title "New Name" --description "Updated desc"
+skool edit-course --id COURSE_ID --privacy private
+skool edit-course --id COURSE_ID --cover new-cover.jpg -g my-community
+
+# List courses (to get IDs)
+skool list-courses -g my-community
+skool list-courses -g my-community --json
+
+# Delete a course
+skool delete-course --id COURSE_ID
 ```
 
 ### Lessons
@@ -113,12 +125,18 @@ import { SkoolClient } from 'skool-cli';
 const client = new SkoolClient();
 await client.login('you@email.com', 'yourpass');
 
-// Create a course
+// Create a course with cover image
 await client.createCourse({
   group: 'my-community',
   title: 'My Course',
   description: 'Course description',
+  coverImage: './cover.jpg',
 });
+
+// List and edit courses
+const { courses } = await client.listCourses('my-community');
+await client.editCourse({ id: courses[0].id, title: 'Updated Name' });
+await client.deleteCourse(courses[0].id);
 
 // Create a lesson with video and resources
 await client.createLesson({
