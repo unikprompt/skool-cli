@@ -22,6 +22,11 @@ function escapeHtml(text: string): string {
 
 function applyInlineFormatting(text: string): string {
   let formatted = text;
+  // Bold+Italic combined: ***text***
+  formatted = formatted.replace(
+    /\*\*\*(.*?)\*\*\*/g,
+    "<strong><em>$1</em></strong>"
+  );
   // Bold: **text** or __text__
   formatted = formatted.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
   formatted = formatted.replace(/__(.*?)__/g, "<strong>$1</strong>");
@@ -30,8 +35,15 @@ function applyInlineFormatting(text: string): string {
     /(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/g,
     "<em>$1</em>"
   );
+  // Strikethrough: ~~text~~
+  formatted = formatted.replace(/~~(.*?)~~/g, "<s>$1</s>");
   // Inline code: `text`
   formatted = formatted.replace(/`(.*?)`/g, "<code>$1</code>");
+  // Links: [text](url)
+  formatted = formatted.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank">$1</a>'
+  );
   return formatted;
 }
 

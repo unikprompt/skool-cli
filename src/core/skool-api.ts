@@ -80,25 +80,34 @@ function htmlToSkoolDesc(html: string): string {
 }
 
 /** Parse inline HTML (bold, italic, code, links) into TipTap text nodes with marks */
-function parseInline(html: string): Record<string, unknown>[] {
+function parseInline(
+  html: string,
+  inheritedMarks: Record<string, unknown>[] = []
+): Record<string, unknown>[] {
   const nodes: Record<string, unknown>[] = [];
 
   // Regex to find inline formatting tags
-  const inlineRegex = /<(strong|b|em|i|code|s|a)([^>]*)>([\s\S]*?)<\/\1>|([^<]+)/gi;
+  const inlineRegex =
+    /<(strong|b|em|i|code|s|a)([^>]*)>([\s\S]*?)<\/\1>|([^<]+)/gi;
   let match;
 
   while ((match = inlineRegex.exec(html)) !== null) {
     if (match[4]) {
-      // Plain text (no tag) — preserve spaces for inline continuity
+      // Plain text (no tag)
       const text = decodeEntities(match[4]);
-      if (text) nodes.push({ type: "text", text });
+      if (text) {
+        if (inheritedMarks.length > 0) {
+          nodes.push({ type: "text", text, marks: [...inheritedMarks] });
+        } else {
+          nodes.push({ type: "text", text });
+        }
+      }
     } else {
       const tag = match[1].toLowerCase();
       const attrs = match[2] || "";
-      const inner = decodeEntities(stripTags(match[3]));
-      if (!inner.trim()) continue;
+      const inner = match[3];
 
-      const marks: Record<string, unknown>[] = [];
+      const marks: Record<string, unknown>[] = [...inheritedMarks];
       if (tag === "strong" || tag === "b") marks.push({ type: "bold" });
       if (tag === "em" || tag === "i") marks.push({ type: "italic" });
       if (tag === "code") marks.push({ type: "code" });
@@ -106,21 +115,33 @@ function parseInline(html: string): Record<string, unknown>[] {
       if (tag === "a") {
         const hrefMatch = attrs.match(/href="([^"]+)"/);
         if (hrefMatch) {
-          marks.push({ type: "link", attrs: { href: hrefMatch[1], target: "_blank" } });
+          marks.push({
+            type: "link",
+            attrs: { href: hrefMatch[1], target: "_blank" },
+          });
         }
       }
 
-      if (marks.length > 0) {
-        nodes.push({ type: "text", text: inner, marks });
+      // Check if inner contains nested tags — if so, recurse
+      if (/<[^>]+>/.test(inner)) {
+        const nested = parseInline(inner, marks);
+        nodes.push(...nested);
       } else {
-        nodes.push({ type: "text", text: inner });
+        const text = decodeEntities(inner);
+        if (!text.trim()) continue;
+        nodes.push({ type: "text", text, marks });
       }
     }
   }
 
   if (nodes.length === 0) {
     const text = decodeEntities(stripTags(html).trim());
-    if (text) return [{ type: "text", text }];
+    if (text) {
+      if (inheritedMarks.length > 0) {
+        return [{ type: "text", text, marks: [...inheritedMarks] }];
+      }
+      return [{ type: "text", text }];
+    }
     return [{ type: "text", text: " " }];
   }
 
