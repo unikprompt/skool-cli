@@ -16,7 +16,7 @@ const API_BASE = "https://api2.skool.com";
  * Supported: paragraphs, headings (h1-h4), bullet lists, ordered lists,
  * bold, italic, code, code blocks, links, horizontal rules.
  */
-function htmlToSkoolDesc(html: string): string {
+export function htmlToSkoolDesc(html: string): string {
   const nodes: Record<string, unknown>[] = [];
 
   // Simple HTML parser — convert HTML tags to TipTap JSON nodes
