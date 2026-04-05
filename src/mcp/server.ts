@@ -444,6 +444,20 @@ server.tool(
 );
 
 server.tool(
+  "skool_get_analytics",
+  "Get group analytics (members, visitors, signups, conversion, MRR)",
+  {
+    group: z.string().describe("Skool group slug"),
+  },
+  async ({ group }) => {
+    const result = await client.getAnalytics(group);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+server.tool(
   "skool_get_leaderboard",
   "Get community leaderboard rankings",
   {

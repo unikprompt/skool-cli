@@ -151,6 +151,14 @@ npx skool-cli list-events -g GROUP --json
 npx skool-cli delete-event --id EVENT_ID
 ```
 
+### Analytics
+
+```bash
+# Get group analytics (members, visitors, signups, conversion, MRR)
+npx skool-cli get-analytics -g GROUP
+npx skool-cli get-analytics -g GROUP --json
+```
+
 ### Leaderboard
 
 ```bash

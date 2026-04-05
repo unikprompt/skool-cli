@@ -1042,6 +1042,33 @@ export class SkoolClient {
     }
   }
 
+  /** Get group analytics */
+  async getAnalytics(groupSlug: string): Promise<{
+    success: boolean;
+    message: string;
+    data: { members: number; conversion: number; visitors: number; signups: number; mrr: number | null };
+  }> {
+    try {
+      const { groupId } = await this.discoverGroupIds(groupSlug);
+      if (!groupId) {
+        return { success: false, message: "Could not discover group ID.", data: { members: 0, conversion: 0, visitors: 0, signups: 0, mrr: null } };
+      }
+
+      const analytics = await this.api.getAnalytics(groupId);
+      return {
+        success: true,
+        message: "Analytics retrieved",
+        data: analytics,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to get analytics: ${(error as Error).message}`,
+        data: { members: 0, conversion: 0, visitors: 0, signups: 0, mrr: null },
+      };
+    }
+  }
+
   /** Get leaderboard rankings */
   async getLeaderboard(
     groupSlug: string,

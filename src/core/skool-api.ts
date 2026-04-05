@@ -754,6 +754,65 @@ export class SkoolApi {
   }
 
   /**
+   * Fetch analytics data (async endpoint with token polling).
+   */
+  private async fetchAnalytics(
+    groupId: string,
+    endpoint: string
+  ): Promise<Record<string, unknown>> {
+    // Step 1: Request analytics (returns token)
+    const initial = await this.request("GET", `/groups/${groupId}/${endpoint}`);
+    if (initial.status !== 200) return {};
+
+    const token = initial.data.token as string;
+    if (!token) {
+      // Data returned directly (admin-metrics)
+      return initial.data;
+    }
+
+    // Step 2: Poll /wait until completed
+    for (let i = 0; i < 10; i++) {
+      const waitResult = await this.request("GET", `/wait?token=${token}`);
+      const waitData = JSON.stringify(waitResult.data);
+      if (waitData.includes("completed")) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+
+    // Step 3: Fetch with token
+    const result = await this.request(
+      "GET",
+      `/groups/${groupId}/${endpoint}${endpoint.includes("?") ? "&" : "?"}token=${token}`
+    );
+    return (result.data.data as Record<string, unknown>) || result.data;
+  }
+
+  /**
+   * Get group analytics (overview, growth, metrics).
+   */
+  async getAnalytics(
+    groupId: string
+  ): Promise<{
+    members: number;
+    conversion: number;
+    visitors: number;
+    signups: number;
+    mrr: number | null;
+  }> {
+    const [overview, growth] = await Promise.all([
+      this.fetchAnalytics(groupId, "analytics-overview-v2"),
+      this.fetchAnalytics(groupId, "analytics-growth-overview-v2"),
+    ]);
+
+    return {
+      members: (overview.num_members as number) || 0,
+      conversion: (overview.conversion as number) || 0,
+      visitors: (growth.num_visitors as number) || 0,
+      signups: (growth.num_signups as number) || 0,
+      mrr: (growth.new_mrr as number) ?? null,
+    };
+  }
+
+  /**
    * Create a community post via API.
    */
   async createPost(options: {
