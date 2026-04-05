@@ -359,6 +359,34 @@ export class SkoolApi {
   }
 
   /**
+   * Move a course left or right in the classroom order.
+   */
+  async moveCourse(
+    courseId: string,
+    direction: "left" | "right"
+  ): Promise<{ success: boolean; message: string }> {
+    const dst = direction === "left" ? 0 : 1;
+    const result = await this.request("POST", `/courses/${courseId}/move2?dst=${dst}`);
+    if (result.status !== 200) {
+      return { success: false, message: `Move failed: ${JSON.stringify(result.data)}` };
+    }
+    return { success: true, message: `Course moved ${direction}` };
+  }
+
+  /**
+   * Duplicate a course with all its content.
+   */
+  async duplicateCourse(
+    courseId: string
+  ): Promise<{ success: boolean; message: string }> {
+    const result = await this.request("POST", `/courses/${courseId}/duplicate`);
+    if (result.status !== 200) {
+      return { success: false, message: `Duplicate failed: ${JSON.stringify(result.data)}` };
+    }
+    return { success: true, message: `Course duplication started. It may take a moment to appear.` };
+  }
+
+  /**
    * Update a course's metadata (title, description, privacy).
    */
   async updateCourse(

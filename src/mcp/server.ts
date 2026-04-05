@@ -119,6 +119,35 @@ server.tool(
 );
 
 server.tool(
+  "skool_move_course",
+  "Move a course left or right in the classroom order",
+  {
+    id: z.string().describe("Course ID to move"),
+    direction: z.enum(["left", "right"]).describe("Direction to move"),
+  },
+  async ({ id, direction }) => {
+    const result = await client.moveCourse(id, direction);
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
+  "skool_duplicate_course",
+  "Duplicate a course with all its content",
+  {
+    id: z.string().describe("Course ID to duplicate"),
+  },
+  async ({ id }) => {
+    const result = await client.duplicateCourse(id);
+    return {
+      content: [{ type: "text", text: result.success ? `OK: ${result.message}` : `FAIL: ${result.message}` }],
+    };
+  }
+);
+
+server.tool(
   "skool_delete_course",
   "Delete a course by ID",
   {

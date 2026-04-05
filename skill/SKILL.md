@@ -84,6 +84,13 @@ npx skool-cli edit-course --id COURSE_ID --cover new-cover.jpg -g GROUP
 npx skool-cli list-courses -g GROUP
 npx skool-cli list-courses -g GROUP --json
 
+# Move a course left/right in the classroom
+npx skool-cli move-course --id COURSE_ID --direction right
+npx skool-cli move-course --id COURSE_ID --direction left
+
+# Duplicate a course (copies all content)
+npx skool-cli duplicate-course --id COURSE_ID
+
 # Delete a course
 npx skool-cli delete-course --id COURSE_ID
 ```

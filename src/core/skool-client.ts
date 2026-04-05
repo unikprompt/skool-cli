@@ -397,6 +397,26 @@ export class SkoolClient {
     }
   }
 
+  /** Move a course left or right */
+  async moveCourse(courseId: string, direction: "left" | "right"): Promise<OperationResult> {
+    try {
+      const result = await this.api.moveCourse(courseId, direction);
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      return { success: false, message: `Failed to move course: ${(error as Error).message}` };
+    }
+  }
+
+  /** Duplicate a course */
+  async duplicateCourse(courseId: string): Promise<OperationResult> {
+    try {
+      const result = await this.api.duplicateCourse(courseId);
+      return { success: result.success, message: result.message };
+    } catch (error) {
+      return { success: false, message: `Failed to duplicate course: ${(error as Error).message}` };
+    }
+  }
+
   /** Delete a course by ID */
   async deleteCourse(courseId: string): Promise<OperationResult> {
     return this.deleteLesson(courseId);
