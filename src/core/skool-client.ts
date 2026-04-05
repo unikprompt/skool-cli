@@ -888,6 +888,69 @@ export class SkoolClient {
     }
   }
 
+  /** Get leaderboard rankings */
+  async getLeaderboard(
+    groupSlug: string,
+    period: "all" | "30d" | "7d" = "all"
+  ): Promise<{
+    success: boolean;
+    message: string;
+    users: { name: string; points: number; level: number }[];
+    levels: { number: number; name: string; percentOfMembers: number }[];
+  }> {
+    try {
+      const page = await this.browser.getPage();
+      await page.goto(`https://www.skool.com/${groupSlug}/-/leaderboards`);
+      await page.waitForTimeout(3000);
+
+      const data = await page.evaluate(
+        ({ p }) => {
+          const script = document.querySelector("script#__NEXT_DATA__");
+          if (!script) return { users: [], levels: [] };
+          const d = JSON.parse(script.textContent || "{}");
+          const pp = d?.props?.pageProps || {};
+
+          const periodMap: Record<string, string> = {
+            all: "allTime",
+            "30d": "past30Days",
+            "7d": "past7Days",
+          };
+          const key = periodMap[p] || "allTime";
+          const raw = (pp as Record<string, unknown>)[key] as Record<string, unknown> | undefined;
+          const users = ((raw?.users as Array<Record<string, unknown>>) || []).map((u) => ({
+            name: (u.name as string) || "",
+            points: ((u.metadata as Record<string, unknown>)?.points as number) || 0,
+            level: ((u.metadata as Record<string, unknown>)?.level as number) || 1,
+          }));
+          const levels = (pp.groupLevels as Array<Record<string, unknown>>) || [];
+          return {
+            users,
+            levels: levels.map((l) => ({
+              number: (l.number as number) || 0,
+              name: (l.name as string) || "",
+              percentOfMembers: (l.percentOfMembers as number) || 0,
+            })),
+          };
+        },
+        { p: period }
+      );
+
+      return {
+        success: true,
+        message: `${data.users.length} user(s) in leaderboard`,
+        users: data.users,
+        levels: data.levels,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to get leaderboard: ${(error as Error).message}`,
+        users: [],
+        levels: [],
+      };
+    }
+  }
+
   async getPosts(
     groupSlug: string
   ): Promise<{ success: boolean; posts: SkoolPost[] }> {

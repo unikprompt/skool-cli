@@ -130,6 +130,17 @@ npx skool-cli get-categories -g GROUP
 
 ### Members
 
+### Leaderboard
+
+```bash
+# Get leaderboard rankings
+npx skool-cli get-leaderboard -g GROUP
+npx skool-cli get-leaderboard -g GROUP --period 30d
+npx skool-cli get-leaderboard -g GROUP --period 7d --json
+```
+
+### Members
+
 ```bash
 # List members
 npx skool-cli get-members -g GROUP

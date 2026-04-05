@@ -356,6 +356,21 @@ server.tool(
 );
 
 server.tool(
+  "skool_get_leaderboard",
+  "Get community leaderboard rankings",
+  {
+    group: z.string().describe("Skool group slug"),
+    period: z.enum(["all", "30d", "7d"]).optional().describe("Time period (default: all)"),
+  },
+  async (args) => {
+    const result = await client.getLeaderboard(args.group, args.period || "all");
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+server.tool(
   "skool_get_posts",
   "List community posts from a Skool group",
   {

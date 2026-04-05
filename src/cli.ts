@@ -17,6 +17,7 @@ import { deletePostCommand } from "./commands/delete-post.js";
 import { getPostsCommand } from "./commands/get-posts.js";
 import { getCategoriesCommand } from "./commands/get-categories.js";
 import { getMembersCommand } from "./commands/get-members.js";
+import { getLeaderboardCommand } from "./commands/get-leaderboard.js";
 import { editLessonCommand } from "./commands/edit-lesson.js";
 import { moveLessonCommand } from "./commands/move-lesson.js";
 import { deleteLessonCommand } from "./commands/delete-lesson.js";
@@ -58,5 +59,6 @@ program.addCommand(getCategoriesCommand);
 
 // Members
 program.addCommand(getMembersCommand);
+program.addCommand(getLeaderboardCommand);
 
 program.parse();
