@@ -196,3 +196,31 @@ describe("htmlToSkoolDesc", () => {
     });
   });
 });
+
+describe("__NEXT_DATA__ regex extraction", () => {
+  // This tests the regex pattern used by fetchNextData()
+  const regex = /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/;
+
+  it("extracts JSON from standard __NEXT_DATA__ script tag", () => {
+    const html = `<html><head><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"users":[]}}}</script></head></html>`;
+    const match = html.match(regex);
+    expect(match).not.toBeNull();
+    const data = JSON.parse(match![1]);
+    expect(data.props.pageProps.users).toEqual([]);
+  });
+
+  it("returns null when no __NEXT_DATA__ present", () => {
+    const html = `<html><body>No data here</body></html>`;
+    const match = html.match(regex);
+    expect(match).toBeNull();
+  });
+
+  it("handles multiline JSON content", () => {
+    const json = JSON.stringify({ props: { pageProps: { users: [{ id: "1", name: "test" }] } } });
+    const html = `<script id="__NEXT_DATA__" type="application/json">${json}</script>`;
+    const match = html.match(regex);
+    expect(match).not.toBeNull();
+    const data = JSON.parse(match![1]);
+    expect(data.props.pageProps.users[0].id).toBe("1");
+  });
+});

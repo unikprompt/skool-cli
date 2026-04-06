@@ -238,6 +238,22 @@ npx skool-cli get-chat-messages --channel CHANNEL_ID --json
 npx skool-cli send-chat-message --channel CHANNEL_ID -m "Your message here"
 ```
 
+### Watch Members (new member monitoring + Telegram alerts)
+
+```bash
+# Configure Telegram bot (one-time setup)
+npx skool-cli watch-members --setup-telegram
+
+# Watch for new members (polls every 5 minutes)
+npx skool-cli watch-members -g GROUP --interval 5m
+
+# Watch with JSON output (for piping to other tools)
+npx skool-cli watch-members -g GROUP --interval 5m --json
+
+# Watch with optional welcome DM
+npx skool-cli watch-members -g GROUP --interval 5m --welcome "Hey #NAME#, welcome!"
+```
+
 ## Content Format
 
 Lessons support full markdown:

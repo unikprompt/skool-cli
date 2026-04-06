@@ -105,6 +105,10 @@ program.addCommand(getChatsCommand);
 program.addCommand(getChatMessagesCommand);
 program.addCommand(sendChatMessageCommand);
 
+// Watch
+import { watchMembersCommand } from "./commands/watch-members.js";
+program.addCommand(watchMembersCommand);
+
 program.parse();
 
 checkForUpdate(pkg.version).catch(() => {});

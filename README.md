@@ -1,6 +1,6 @@
 # skool-cli
 
-CLI, MCP Server, and programmatic API for [Skool.com](https://www.skool.com) automation. 35 commands covering courses, lessons, events, posts, members, analytics, group settings, user profile, notifications, and chat.
+CLI, MCP Server, and programmatic API for [Skool.com](https://www.skool.com) automation. 36 commands covering courses, lessons, events, posts, members, analytics, group settings, user profile, notifications, chat, and new member monitoring with Telegram alerts.
 
 **Skool has no public API.** This tool uses browser automation (Playwright) for auth and Skool's internal API for all content operations.
 
@@ -12,7 +12,7 @@ npx playwright install chromium
 skool login --email you@email.com --password yourpass
 ```
 
-## Commands (35)
+## Commands (36)
 
 ### Authentication
 
@@ -148,6 +148,22 @@ skool get-chat-messages --channel CHANNEL_ID --json
 skool send-chat-message --channel CHANNEL_ID -m "Hey!"
 ```
 
+### Watch Members (Telegram Alerts)
+
+```bash
+# One-time setup: configure Telegram bot
+skool watch-members --setup-telegram
+
+# Monitor for new members (polls every 5 minutes)
+skool watch-members -g my-community --interval 5m
+
+# With JSON output for piping
+skool watch-members -g my-community --interval 5m --json
+
+# With optional welcome DM (#NAME# replaced with member's first name)
+skool watch-members -g my-community --welcome "Hey #NAME#, welcome!"
+```
+
 ## Content Format
 
 Lessons support full markdown with auto-upload of local images:
@@ -232,6 +248,8 @@ await client.close();
 | `SKOOL_CLI_HEADLESS` | `false` for visible browser |
 | `SKOOL_CLI_DATA_DIR` | Data directory (default: `~/.skool-cli/`) |
 | `SKOOL_CLI_TIMEOUT` | Timeout in ms (default: 30000) |
+| `SKOOL_TELEGRAM_BOT_TOKEN` | Telegram bot token (alternative to --setup-telegram) |
+| `SKOOL_TELEGRAM_CHAT_ID` | Telegram chat ID (alternative to --setup-telegram) |
 
 ## Use as Claude Code Skill
 

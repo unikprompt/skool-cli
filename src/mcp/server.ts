@@ -671,6 +671,36 @@ server.tool(
 );
 
 // ----------------------------------------------------------
+// Watch tools
+// ----------------------------------------------------------
+
+server.tool(
+  "skool_check_new_members",
+  "Check for new members in a Skool group (compares against last known snapshot)",
+  {
+    group: z.string().describe("Skool group slug"),
+  },
+  async ({ group }) => {
+    const { checkOnce } = await import("../core/member-watcher.js");
+    const { newMembers, allMembers } = await checkOnce(client, group);
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({
+          totalMembers: allMembers.length,
+          newMembers: newMembers.map((m) => ({
+            id: m.id,
+            name: `${m.firstName} ${m.lastName}`.trim(),
+            username: m.name,
+            joinedAt: m.joinedAt,
+          })),
+        }, null, 2),
+      }],
+    };
+  }
+);
+
+// ----------------------------------------------------------
 // Start server
 // ----------------------------------------------------------
 

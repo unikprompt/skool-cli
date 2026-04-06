@@ -5,9 +5,13 @@
  * Uses auth cookies from the browser session for authentication.
  */
 
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { BrowserManager } from "./browser-manager.js";
+import { DATA_DIR } from "./config.js";
 
 const API_BASE = "https://api2.skool.com";
+const AUTH_STATE_PATH = join(DATA_DIR, "auth-state.json");
 
 /**
  * Convert HTML to Skool's TipTap JSON desc format.
@@ -197,12 +201,71 @@ function stripTags(html: string): string {
 export class SkoolApi {
   constructor(private browser: BrowserManager) {}
 
+  /** Read auth cookies from saved state file (no browser needed) */
+  private loadCookiesFromFile(): string {
+    if (!existsSync(AUTH_STATE_PATH)) {
+      throw new Error("No auth state file found. Run: skool login");
+    }
+    const state = JSON.parse(readFileSync(AUTH_STATE_PATH, "utf-8")) as {
+      cookies: Array<{ name: string; value: string }>;
+    };
+    return state.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+  }
+
   /** Get auth cookies from the browser session */
   private async getCookies(): Promise<string> {
     const page = await this.browser.getPage();
     const context = page.context();
     const cookies = await context.cookies();
     return cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+  }
+
+  /**
+   * Refresh WAF token by briefly launching Playwright, visiting a Skool page,
+   * and saving fresh cookies to disk. Closes browser immediately after.
+   */
+  async refreshWafToken(): Promise<void> {
+    const page = await this.browser.getPage();
+    await page.goto("https://www.skool.com", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(3000);
+    await this.browser.saveAuthState();
+  }
+
+  /**
+   * Fetch a Skool page and extract __NEXT_DATA__ via HTTP.
+   * Uses saved cookies (file-based). If WAF blocks the request,
+   * refreshes the WAF token via Playwright and retries once.
+   */
+  async fetchNextData(url: string): Promise<Record<string, unknown> | null> {
+    const attemptFetch = async (): Promise<{ ok: boolean; html: string }> => {
+      const cookies = this.loadCookiesFromFile();
+      const res = await fetch(url, {
+        headers: {
+          Cookie: cookies,
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+      });
+      return { ok: res.status === 200, html: await res.text() };
+    };
+
+    // First attempt with saved cookies
+    let result = await attemptFetch();
+
+    // If WAF blocked, refresh token and retry
+    if (!result.ok) {
+      await this.refreshWafToken();
+      result = await attemptFetch();
+    }
+
+    if (!result.ok) return null;
+
+    const match = result.html.match(
+      /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/
+    );
+    if (!match) return null;
+    return JSON.parse(match[1]) as Record<string, unknown>;
   }
 
   /** Make an authenticated API request */

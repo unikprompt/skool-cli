@@ -35,3 +35,12 @@ export const NPM_REGISTRY_URL = "https://registry.npmjs.org/skool-cli/latest";
 /** Disable update checks via env var */
 export const UPDATE_CHECK_DISABLED =
   process.env.SKOOL_CLI_NO_UPDATE_CHECK === "true";
+
+/** File to persist known members for watch-members */
+export const WATCH_STATE_FILE = join(DATA_DIR, "watch-members.json");
+
+/** File to store Telegram bot config */
+export const TELEGRAM_CONFIG_FILE = join(DATA_DIR, "telegram.json");
+
+/** Default polling interval for watch-members (ms) */
+export const DEFAULT_WATCH_INTERVAL = 5 * 60 * 1000;

@@ -1247,42 +1247,37 @@ export class SkoolClient {
     search?: string
   ): Promise<{ success: boolean; members: SkoolMember[] }> {
     try {
-      const page = await this.browser.getPage();
       const url = search
         ? `https://www.skool.com/${groupSlug}/-/members?q=${encodeURIComponent(search)}`
         : `https://www.skool.com/${groupSlug}/-/members`;
-      await page.goto(url, { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(4000);
 
-      const rawMembers = await page.evaluate(() => {
-        const script = document.querySelector("script#__NEXT_DATA__");
-        if (!script) return [];
-        const d = JSON.parse(script.textContent || "{}");
-        const users = d?.props?.pageProps?.users || [];
-        return (users as Array<Record<string, unknown>>).map((u) => {
-          const meta = (u.metadata || {}) as Record<string, string>;
-          const member = (u.member || {}) as Record<string, string>;
-          let spData = { pts: 0, lv: 1 };
-          try { spData = JSON.parse(meta.spData || "{}"); } catch { /* ignore */ }
-          return {
-            id: String(u.id || ""),
-            name: String(u.name || ""),
-            firstName: String(u.firstName || ""),
-            lastName: String(u.lastName || ""),
-            bio: String(meta.bio || ""),
-            level: Number((spData as Record<string, number>).lv || 1),
-            points: Number((spData as Record<string, number>).pts || 0),
-            role: String(member.role || "member"),
-            joinedAt: String(member.createdAt || ""),
-            photoUrl: String(meta.pictureProfile || ""),
-          };
-        });
+      const nextData = await this.api.fetchNextData(url);
+      if (!nextData) return { success: false, members: [] };
+
+      const pageProps = (
+        (nextData as Record<string, unknown>).props as Record<string, unknown>
+      )?.pageProps as Record<string, unknown> | undefined;
+      const users = (pageProps?.users || []) as Array<Record<string, unknown>>;
+
+      const members: SkoolMember[] = users.map((u) => {
+        const meta = (u.metadata || {}) as Record<string, string>;
+        const member = (u.member || {}) as Record<string, string>;
+        let spData = { pts: 0, lv: 1 };
+        try { spData = JSON.parse(meta.spData || "{}"); } catch { /* ignore */ }
+        return {
+          id: String(u.id || ""),
+          name: String(u.name || ""),
+          firstName: String(u.firstName || ""),
+          lastName: String(u.lastName || ""),
+          bio: String(meta.bio || ""),
+          level: Number((spData as Record<string, number>).lv || 1),
+          points: Number((spData as Record<string, number>).pts || 0),
+          contributions: 0,
+          role: String(member.role || "member"),
+          joinedAt: String(member.createdAt || ""),
+          photoUrl: String(meta.pictureProfile || ""),
+        };
       });
-
-      const members: SkoolMember[] = rawMembers.map((m) => ({
-        ...m,
-        contributions: 0,
-      }));
 
       return { success: true, members };
     } catch {
