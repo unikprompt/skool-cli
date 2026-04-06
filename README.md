@@ -255,7 +255,7 @@ curl -o .claude/skills/skool-cli/SKILL.md https://raw.githubusercontent.com/unik
 
 ## Learn More
 
-- [LinkedIn](https://www.linkedin.com/in/mario-perez-ed) - Mario Perez Edwards
+- [LinkedIn](https://www.linkedin.com/in/mario-perez-edwards/) - Mario Perez Edwards
 - [X @mperedwa](https://x.com/mperedwa) - Updates and builds
 - [Skool: Operadores Aumentados](https://skool.com/operadores-aumentados) - Premium community
 - [UNIKPROMPT](https://unikprompt.com) - More tools and resources
