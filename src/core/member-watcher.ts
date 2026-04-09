@@ -7,7 +7,9 @@ import {
   loadTelegramConfig,
   sendTelegramMessage,
   formatNewMemberMessage,
+  formatPendingMemberMessage,
 } from "./telegram.js";
+import { checkPendingOnce } from "./pending-watcher.js";
 
 export interface WatchState {
   [groupSlug: string]: string[]; // array of member IDs
@@ -18,6 +20,7 @@ export interface WatchOptions {
   interval: number;
   welcomeMessage?: string;
   json?: boolean;
+  includePending?: boolean;
 }
 
 /** Load known member IDs from disk */
@@ -95,7 +98,7 @@ export async function checkOnce(
 
 /** Start the watch loop */
 export async function startWatching(options: WatchOptions): Promise<void> {
-  const { group, interval, welcomeMessage, json } = options;
+  const { group, interval, welcomeMessage, json, includePending } = options;
   const telegramConfig = loadTelegramConfig();
 
   if (!telegramConfig) {
@@ -121,7 +124,6 @@ export async function startWatching(options: WatchOptions): Promise<void> {
 
       if (newMembers.length === 0) {
         log(`${allMembers.length} members, no new ones.`);
-        return;
       }
 
       for (const member of newMembers) {
@@ -169,9 +171,68 @@ export async function startWatching(options: WatchOptions): Promise<void> {
         }
       }
 
-      log(`${newMembers.length} new member(s) detected.`);
+      if (newMembers.length > 0) {
+        log(`${newMembers.length} new member(s) detected.`);
+      }
+
+      // Also check pending requests if enabled
+      if (includePending) {
+        await checkPending();
+      }
     } catch (error) {
       log(`Error: ${(error as Error).message}`);
+    }
+  };
+
+  const checkPending = async () => {
+    try {
+      log("Checking pending requests...");
+      const { newPending, allPending } = await checkPendingOnce(client, group);
+
+      if (newPending.length === 0) {
+        log(`${allPending.length} pending request(s), no new ones.`);
+        return;
+      }
+
+      for (const member of newPending) {
+        const name = `${member.firstName} ${member.lastName}`.trim();
+
+        if (json) {
+          console.log(
+            JSON.stringify({
+              event: "new_pending_request",
+              member: { id: member.id, name, requestedAt: member.requestedAt, questions: member.questions },
+              group,
+              timestamp: new Date().toISOString(),
+            })
+          );
+        } else {
+          console.log(`\n  PENDING REQUEST: ${name} (@${member.name})`);
+          console.log(`  Requested: ${member.requestedAt}`);
+          if (member.bio) console.log(`  Bio: ${member.bio.slice(0, 80)}`);
+          if (member.questions) {
+            for (const qa of member.questions) {
+              console.log(`  Q: ${qa.question}`);
+              console.log(`  A: ${qa.answer}`);
+            }
+          }
+          console.log();
+        }
+
+        if (telegramConfig) {
+          const msg = formatPendingMemberMessage(name, group, member.requestedAt, member.questions);
+          const tgResult = await sendTelegramMessage(msg, telegramConfig);
+          if (!tgResult.success) {
+            log(`Telegram error: ${tgResult.message}`);
+          } else {
+            log("Telegram notification sent.");
+          }
+        }
+      }
+
+      log(`${newPending.length} new pending request(s) detected.`);
+    } catch (error) {
+      log(`Pending check error: ${(error as Error).message}`);
     }
   };
 

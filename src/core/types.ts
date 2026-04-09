@@ -172,6 +172,18 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+/** A pending membership request */
+export interface PendingMember {
+  id: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+  bio: string;
+  photoUrl: string;
+  requestedAt: string;
+  questions?: { question: string; answer: string }[];
+}
+
 /** Result of an operation */
 export interface OperationResult {
   success: boolean;

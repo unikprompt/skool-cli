@@ -107,7 +107,9 @@ program.addCommand(sendChatMessageCommand);
 
 // Watch
 import { watchMembersCommand } from "./commands/watch-members.js";
+import { watchPendingCommand } from "./commands/watch-pending.js";
 program.addCommand(watchMembersCommand);
+program.addCommand(watchPendingCommand);
 
 program.parse();
 

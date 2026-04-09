@@ -13,6 +13,7 @@ export const watchMembersCommand = new Command("watch-members")
   .option("--interval <time>", "Polling interval (e.g. 5m, 1h)", "5m")
   .option("--setup-telegram", "Configure Telegram bot interactively")
   .option("--welcome <message>", "Welcome DM message (#NAME# as variable)")
+  .option("--include-pending", "Also watch for pending membership requests")
   .option("--json", "Output events as JSON")
   .action(async (opts) => {
     // Setup mode
@@ -75,5 +76,6 @@ export const watchMembersCommand = new Command("watch-members")
       interval,
       welcomeMessage: opts.welcome,
       json: opts.json,
+      includePending: opts.includePending,
     });
   });

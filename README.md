@@ -1,6 +1,6 @@
 # skool-cli
 
-CLI, MCP Server, and programmatic API for [Skool.com](https://www.skool.com) automation. 36 commands covering courses, lessons, events, posts, members, analytics, group settings, user profile, notifications, chat, and new member monitoring with Telegram alerts.
+CLI, MCP Server, and programmatic API for [Skool.com](https://www.skool.com) automation. 37 commands covering courses, lessons, events, posts, members, analytics, group settings, user profile, notifications, chat, new member monitoring, and pending membership request alerts via Telegram.
 
 **Skool has no public API.** This tool uses browser automation (Playwright) for auth and Skool's internal API for all content operations.
 
@@ -12,7 +12,7 @@ npx playwright install chromium
 skool login --email you@email.com --password yourpass
 ```
 
-## Commands (36)
+## Commands (37)
 
 ### Authentication
 
@@ -162,7 +162,22 @@ skool watch-members -g my-community --interval 5m --json
 
 # With optional welcome DM (#NAME# replaced with member's first name)
 skool watch-members -g my-community --welcome "Hey #NAME#, welcome!"
+
+# Also monitor pending membership requests (requires admin/moderator auth)
+skool watch-members -g my-community --include-pending
 ```
+
+### Watch Pending Requests (Telegram Alerts)
+
+```bash
+# Monitor for new pending membership requests (requires admin/moderator auth)
+skool watch-pending -g my-community --interval 5m
+
+# With JSON output
+skool watch-pending -g my-community --json
+```
+
+Pending request notifications include the applicant's name, request time, and their answers to membership questions (if configured).
 
 ## Content Format
 
@@ -234,6 +249,10 @@ await client.markNotificationsRead();
 const { channels } = await client.getChats();
 const { messages } = await client.getChatMessages(channels[0].id);
 await client.sendChatMessage(channels[0].id, 'Hello!');
+
+// Pending membership requests (requires admin/moderator auth)
+const { pending } = await client.getPendingMembers('my-community');
+// Returns: { id, name, firstName, lastName, bio, photoUrl, requestedAt, questions[] }
 
 await client.close();
 ```

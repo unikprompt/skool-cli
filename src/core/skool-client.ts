@@ -14,6 +14,7 @@ import type {
   OperationResult,
   SkoolPost,
   SkoolMember,
+  PendingMember,
   SkoolNotification,
   UserProfile,
   UserCommunity,
@@ -1282,6 +1283,51 @@ export class SkoolClient {
       return { success: true, members };
     } catch {
       return { success: false, members: [] };
+    }
+  }
+
+  /** Get pending membership requests (requires admin/moderator auth) */
+  async getPendingMembers(
+    groupSlug: string
+  ): Promise<{ success: boolean; pending: PendingMember[] }> {
+    try {
+      const url = `https://www.skool.com/${groupSlug}/-/members?tab=pending`;
+
+      const nextData = await this.api.fetchNextData(url);
+      if (!nextData) return { success: false, pending: [] };
+
+      const pageProps = (
+        (nextData as Record<string, unknown>).props as Record<string, unknown>
+      )?.pageProps as Record<string, unknown> | undefined;
+      const users = (pageProps?.users || []) as Array<Record<string, unknown>>;
+
+      const pending: PendingMember[] = users.map((u) => {
+        const meta = (u.metadata || {}) as Record<string, string>;
+        const member = (u.member || {}) as Record<string, unknown>;
+        const memberMeta = (member.metadata || {}) as Record<string, unknown>;
+
+        // Extract membership questions/answers if present
+        let questions: { question: string; answer: string }[] | undefined;
+        const answers = memberMeta.answers as Array<{ question: string; answer: string }> | undefined;
+        if (answers && Array.isArray(answers) && answers.length > 0) {
+          questions = answers;
+        }
+
+        return {
+          id: String(u.id || ""),
+          name: String(u.name || ""),
+          firstName: String(u.firstName || ""),
+          lastName: String(u.lastName || ""),
+          bio: String(meta.bio || ""),
+          photoUrl: String(meta.pictureProfile || ""),
+          requestedAt: String(member.createdAt || ""),
+          questions,
+        };
+      });
+
+      return { success: true, pending };
+    } catch {
+      return { success: false, pending: [] };
     }
   }
 

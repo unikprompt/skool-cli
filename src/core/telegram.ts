@@ -88,6 +88,29 @@ export function formatNewMemberMessage(
   ].join("\n");
 }
 
+/** Format a pending member request notification for Telegram */
+export function formatPendingMemberMessage(
+  memberName: string,
+  groupName: string,
+  requestedAt: string,
+  questions?: { question: string; answer: string }[]
+): string {
+  const timeAgo = getTimeAgo(requestedAt);
+  const lines = [
+    `<b>Pending request in ${escapeHtml(groupName)}</b>`,
+    `${escapeHtml(memberName)}`,
+    `Requested ${timeAgo}`,
+  ];
+  if (questions && questions.length > 0) {
+    lines.push("");
+    for (const qa of questions) {
+      lines.push(`<b>Q:</b> ${escapeHtml(qa.question)}`);
+      lines.push(`<b>A:</b> ${escapeHtml(qa.answer)}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
