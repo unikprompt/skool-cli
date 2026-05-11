@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { BrowserManager } from "./browser-manager.js";
 import { PageOps } from "./page-ops.js";
-import { SkoolApi } from "./skool-api.js";
+import { SkoolApi, skoolDescToHtml } from "./skool-api.js";
 import { markdownToHtml, structuredContentToHtml } from "./html-generator.js";
 import type {
   CreateCourseOptions,
@@ -21,6 +21,118 @@ import type {
   ChatChannel,
   ChatMessage,
 } from "./types.js";
+
+/**
+ * Flat lesson entry produced by walking Skool's __NEXT_DATA__ course tree.
+ */
+interface LessonTreeLeaf {
+  id: string;
+  title: string;
+  path: string[];
+  metadata: Record<string, unknown>;
+  self: Record<string, unknown>;
+}
+
+/** Walk a Skool __NEXT_DATA__ course node recursively, collecting leaf lessons. */
+function walkCourseTree(
+  node: unknown,
+  path: string[],
+  out: LessonTreeLeaf[],
+  folders: Array<{ title: string; path: string[]; children: LessonTreeLeaf[] }>
+): void {
+  if (!node || typeof node !== "object") return;
+  const n = node as Record<string, unknown>;
+  const self = (n.course as Record<string, unknown>) || n;
+  const metadata = (self.metadata as Record<string, unknown>) || {};
+  const title = (metadata.title as string) || "";
+  const children = n.children as unknown[] | undefined;
+
+  if (children && Array.isArray(children) && children.length > 0) {
+    // Folder / branch
+    const here = title ? [...path, title] : path;
+    // Root of course: do not push as a folder, only descend
+    const isRoot = path.length === 0;
+    if (!isRoot) {
+      const folder = { title, path: here, children: [] as LessonTreeLeaf[] };
+      folders.push(folder);
+      const before = out.length;
+      for (const ch of children) walkCourseTree(ch, here, out, folders);
+      folder.children.push(...out.slice(before));
+    } else {
+      for (const ch of children) walkCourseTree(ch, here, out, folders);
+    }
+    return;
+  }
+
+  // Leaf — lesson
+  if (self.id) {
+    out.push({
+      id: self.id as string,
+      title,
+      path,
+      metadata,
+      self,
+    });
+  }
+}
+
+/** Find a node by pageId within a course tree. Returns null when absent. */
+function findNodeInTree(
+  node: unknown,
+  pageId: string,
+  path: string[] = []
+): { self: Record<string, unknown>; path: string[] } | null {
+  if (!node || typeof node !== "object") return null;
+  const n = node as Record<string, unknown>;
+  const self = (n.course as Record<string, unknown>) || n;
+  const metadata = (self.metadata as Record<string, unknown>) || {};
+  const title = (metadata.title as string) || "";
+  if (self.id === pageId) {
+    return { self, path };
+  }
+  const children = n.children as unknown[] | undefined;
+  if (children && Array.isArray(children)) {
+    const here = title ? [...path, title] : path;
+    for (const ch of children) {
+      const result = findNodeInTree(ch, pageId, here);
+      if (result) return result;
+    }
+  }
+  return null;
+}
+
+/** Extract the course short ID from a Skool classroom URL path. */
+function extractCourseShortIdFromUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split("/").filter(Boolean);
+    // Expected: /{group}/classroom/{shortId}
+    const idx = parts.indexOf("classroom");
+    if (idx >= 0 && idx + 1 < parts.length) return parts[idx + 1];
+  } catch {
+    // Ignore malformed URL
+  }
+  return "";
+}
+
+/** Parse a full lesson URL into (group, courseShortId, pageId). */
+function parseLessonUrl(
+  url: string
+): { group: string; courseShortId: string; pageId: string } | null {
+  try {
+    const u = new URL(url, "https://www.skool.com");
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (parts.length < 2) return null;
+    const group = parts[0];
+    const classroomIdx = parts.indexOf("classroom");
+    const courseShortId = classroomIdx >= 0 ? parts[classroomIdx + 1] || "" : "";
+    const pageId = u.searchParams.get("md") || "";
+    if (!group || !pageId) return null;
+    return { group, courseShortId, pageId };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * High-level Skool client.
@@ -593,6 +705,199 @@ export class SkoolClient {
     }
   }
 
+  /**
+   * Get a lesson's full content and metadata.
+   *
+   * Skool's public REST API does not expose a GET endpoint for individual
+   * pages, so we navigate to the lesson URL and extract __NEXT_DATA__ which
+   * contains the full TipTap desc for the currently-selected lesson.
+   *
+   * Provide either `url` (full lesson URL) or (`group` + `pageId`). If only
+   * group+pageId is given, we first discover the course short ID by walking
+   * the classroom tree, then navigate to the lesson URL.
+   */
+  async getLesson(options: {
+    pageId?: string;
+    group?: string;
+    courseShortId?: string;
+    courseName?: string;
+    url?: string;
+  }): Promise<{
+    success: boolean;
+    message: string;
+    data?: {
+      id: string;
+      title: string;
+      desc: string;
+      html: string;
+      videoLink?: string;
+      coursePath: string[];
+      courseShortId: string;
+      group: string;
+      url: string;
+      metadata: Record<string, unknown>;
+    };
+  }> {
+    try {
+      let group = options.group || "";
+      let courseShortId = options.courseShortId || "";
+      let pageId = options.pageId || "";
+
+      if (options.url) {
+        const parsed = parseLessonUrl(options.url);
+        if (!parsed) {
+          return { success: false, message: `Could not parse lesson URL: ${options.url}` };
+        }
+        group = parsed.group;
+        courseShortId = parsed.courseShortId;
+        pageId = parsed.pageId;
+      }
+
+      if (!group || !pageId) {
+        return {
+          success: false,
+          message: "Provide --url or (--group and --id).",
+        };
+      }
+
+      // If we don't yet know the courseShortId, discover it by loading the
+      // classroom and walking the tree to find the lesson's containing course.
+      if (!courseShortId) {
+        const discovered = await this.findLessonCourseShortId(
+          group,
+          pageId,
+          options.courseName
+        );
+        if (!discovered) {
+          return {
+            success: false,
+            message: `Could not locate lesson ${pageId} in group ${group}. Provide --course-short-id.`,
+          };
+        }
+        courseShortId = discovered;
+      }
+
+      const lessonUrl = `https://www.skool.com/${group}/classroom/${courseShortId}?md=${pageId}`;
+      const page = await this.browser.getPage();
+      await page.goto(lessonUrl, { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(2500);
+
+      const treeJson = await page.evaluate(() => {
+        const script = document.querySelector("script#__NEXT_DATA__");
+        return script ? script.textContent : null;
+      });
+
+      if (!treeJson) {
+        return {
+          success: false,
+          message: `Could not read __NEXT_DATA__ from ${lessonUrl}`,
+        };
+      }
+
+      const parsed = JSON.parse(treeJson) as Record<string, unknown>;
+      const pageProps = (parsed.props as Record<string, unknown> | undefined)
+        ?.pageProps as Record<string, unknown> | undefined;
+      const rootCourseNode = pageProps?.course;
+      if (!rootCourseNode) {
+        return { success: false, message: "No course tree in __NEXT_DATA__." };
+      }
+
+      const match = findNodeInTree(rootCourseNode, pageId);
+      if (!match) {
+        return {
+          success: false,
+          message: `Lesson ${pageId} not found in course tree at ${lessonUrl}`,
+        };
+      }
+
+      const metadata = (match.self.metadata as Record<string, unknown>) || {};
+      const title = (metadata.title as string) || "";
+      const desc = (metadata.desc as string) || "";
+      const html = desc.startsWith("[v2]") ? skoolDescToHtml(desc) : desc;
+      const videoLink = (metadata.video_link as string) || undefined;
+
+      return {
+        success: true,
+        message: `Fetched lesson ${pageId}`,
+        data: {
+          id: pageId,
+          title,
+          desc,
+          html,
+          videoLink,
+          coursePath: match.path,
+          courseShortId,
+          group,
+          url: lessonUrl,
+          metadata,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to get lesson: ${(error as Error).message}`,
+      };
+    }
+  }
+
+  /**
+   * Navigate to a group's classroom (optionally picking a course by name) and
+   * extract the pageProps.course tree from __NEXT_DATA__. Returns the raw
+   * tree along with the courseShortId captured from the final URL.
+   */
+  private async fetchCourseTree(
+    groupSlug: string,
+    courseName?: string
+  ): Promise<{ courseShortId: string; rootNode: unknown } | null> {
+    const page = await this.browser.getPage();
+    await this.ops.gotoClassroom(groupSlug);
+    if (courseName) {
+      try {
+        await page
+          .getByText(courseName, { exact: false })
+          .first()
+          .click({ timeout: 8000 });
+      } catch {
+        // Not a fatal error — the classroom may already show the course
+      }
+      await page.waitForTimeout(2500);
+    } else {
+      await page.waitForTimeout(1500);
+    }
+
+    const currentUrl = page.url();
+    const courseShortId = extractCourseShortIdFromUrl(currentUrl);
+
+    const treeJson = await page.evaluate(() => {
+      const script = document.querySelector("script#__NEXT_DATA__");
+      return script ? script.textContent : null;
+    });
+    if (!treeJson) return null;
+    const parsed = JSON.parse(treeJson) as Record<string, unknown>;
+    const pageProps = (parsed.props as Record<string, unknown> | undefined)
+      ?.pageProps as Record<string, unknown> | undefined;
+    const rootNode = pageProps?.course;
+    if (!rootNode) return null;
+    return { courseShortId, rootNode };
+  }
+
+  /**
+   * Walk a group's classroom looking for a lesson by pageId. If courseName is
+   * provided, searches that course first. Falls back to the default course.
+   * Returns the courseShortId that owns the lesson, or null if not found.
+   */
+  private async findLessonCourseShortId(
+    groupSlug: string,
+    pageId: string,
+    courseName?: string
+  ): Promise<string | null> {
+    const tree = await this.fetchCourseTree(groupSlug, courseName);
+    if (!tree) return null;
+    const match = findNodeInTree(tree.rootNode, pageId);
+    if (match) return tree.courseShortId;
+    return null;
+  }
+
   /** Edit an existing lesson's title and/or content */
   async editLesson(options: EditLessonOptions): Promise<OperationResult> {
     let html: string | undefined;
@@ -691,8 +996,96 @@ export class SkoolClient {
     }
   }
 
-  /** List all lessons and folders in a course (from sidebar DOM) */
+  /**
+   * List all lessons and folders in a course by walking Skool's
+   * __NEXT_DATA__ course tree. Returns a flat hierarchical view with real
+   * page IDs and the course's short ID for URL construction.
+   */
   async listLessons(
+    groupSlug: string,
+    courseName?: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    courseShortId?: string;
+    items: Array<{
+      name: string;
+      type: "folder" | "lesson";
+      id?: string;
+      href?: string;
+      path?: string[];
+      children?: Array<{
+        name: string;
+        id?: string;
+        href?: string;
+        path?: string[];
+      }>;
+    }>;
+  }> {
+    try {
+      const tree = await this.fetchCourseTree(groupSlug, courseName);
+      if (!tree) {
+        return {
+          success: false,
+          message: "Could not read course tree from __NEXT_DATA__",
+          items: [],
+        };
+      }
+
+      const leaves: LessonTreeLeaf[] = [];
+      const folders: Array<{
+        title: string;
+        path: string[];
+        children: LessonTreeLeaf[];
+      }> = [];
+      walkCourseTree(tree.rootNode, [], leaves, folders);
+
+      const items: Array<{
+        name: string;
+        type: "folder" | "lesson";
+        id?: string;
+        href?: string;
+        path?: string[];
+        children?: Array<{
+          name: string;
+          id?: string;
+          href?: string;
+          path?: string[];
+        }>;
+      }> = [];
+
+      for (const folder of folders) {
+        const children = folder.children.map((leaf) => ({
+          name: leaf.title,
+          id: leaf.id,
+          href: `/${groupSlug}/classroom/${tree.courseShortId}?md=${leaf.id}`,
+          path: leaf.path,
+        }));
+        items.push({
+          name: folder.title,
+          type: "folder" as const,
+          path: folder.path,
+          children,
+        });
+      }
+
+      return {
+        success: true,
+        message: `Found ${leaves.length} lesson(s) across ${folders.length} folder(s)`,
+        courseShortId: tree.courseShortId,
+        items,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to list lessons: ${(error as Error).message}`,
+        items: [],
+      };
+    }
+  }
+
+  /** Legacy DOM-based sidebar scrape, kept for reference. Unused. */
+  private async listLessonsFromDom(
     groupSlug: string,
     courseName?: string
   ): Promise<{
@@ -701,7 +1094,9 @@ export class SkoolClient {
     items: Array<{
       name: string;
       type: "folder" | "lesson";
-      children?: Array<{ name: string }>;
+      id?: string;
+      href?: string;
+      children?: Array<{ name: string; id?: string; href?: string }>;
     }>;
   }> {
     try {
@@ -721,10 +1116,30 @@ export class SkoolClient {
       // Folders have class MenuItemTitle with a chevron (expandable)
       // Lessons are links inside expanded folders or at course root
       const items = await page.evaluate(() => {
+        // Extract a lesson page ID from a Skool classroom href.
+        // Format is /{group}/classroom/{courseId}?md={pageId} — we pull md.
+        // Fallback to the last path segment if md is absent.
+        const extractId = (href: string | null | undefined): string | undefined => {
+          if (!href) return undefined;
+          try {
+            const u = new URL(href, window.location.origin);
+            const md = u.searchParams.get("md");
+            if (md) return md;
+            const parts = u.pathname.split("/").filter(Boolean);
+            const last = parts[parts.length - 1];
+            if (last && last !== "classroom") return last;
+          } catch {
+            // Ignore malformed href
+          }
+          return undefined;
+        };
+
         const result: Array<{
           name: string;
           type: "folder" | "lesson";
-          children?: Array<{ name: string }>;
+          id?: string;
+          href?: string;
+          children?: Array<{ name: string; id?: string; href?: string }>;
         }> = [];
 
         // All items in the sidebar menu
@@ -735,7 +1150,7 @@ export class SkoolClient {
         let currentFolder: {
           name: string;
           type: "folder";
-          children: Array<{ name: string }>;
+          children: Array<{ name: string; id?: string; href?: string }>;
         } | null = null;
 
         wrappers.forEach((wrapper) => {
@@ -769,8 +1184,10 @@ export class SkoolClient {
               );
               childLinks.forEach((link) => {
                 const childName = link.textContent?.trim() || "";
+                const href = (link as HTMLAnchorElement).getAttribute("href") || undefined;
+                const id = extractId(href);
                 if (childName && childName !== name) {
-                  currentFolder!.children.push({ name: childName });
+                  currentFolder!.children.push({ name: childName, id, href });
                 }
               });
               result.push(currentFolder);
@@ -780,7 +1197,9 @@ export class SkoolClient {
               // Check if it has a link (lessons have links, folders don't always)
               const link = wrapper.querySelector('a[href*="/classroom/"]');
               if (link) {
-                result.push({ name, type: "lesson" });
+                const href = (link as HTMLAnchorElement).getAttribute("href") || undefined;
+                const id = extractId(href);
+                result.push({ name, type: "lesson", id, href });
               } else {
                 // Collapsed folder (no children visible)
                 result.push({ name, type: "folder", children: [] });

@@ -24,8 +24,11 @@ export function htmlToSkoolDesc(html: string): string {
   const nodes: Record<string, unknown>[] = [];
 
   // Simple HTML parser — convert HTML tags to TipTap JSON nodes
-  // Split by block-level tags (including self-closing img)
-  const blockRegex = /<(h[1-4]|p|ul|ol|pre|hr|blockquote)[^>]*>([\s\S]*?)<\/\1>|<hr\s*\/?>|<img\s+[^>]*\/?>/gi;
+  // Split by block-level tags (including self-closing img).
+  // Note: alternation is longest-first so `pre` and `blockquote` win over `p`
+  // (JS regex alternation is leftmost, not longest — `<pre>` would otherwise
+  // be captured as `<p` with attrs `re`).
+  const blockRegex = /<(blockquote|pre|h[1-4]|ul|ol|p|hr)[^>]*>([\s\S]*?)<\/\1>|<hr\s*\/?>|<img\s+[^>]*\/?>/gi;
   let match;
   let lastIndex = 0;
 
@@ -42,10 +45,12 @@ export function htmlToSkoolDesc(html: string): string {
 
     if (tag.startsWith("h")) {
       const level = parseInt(tag[1]);
+      // Preserve inline marks (bold/italic/code/link) inside headings.
+      // Previously this used stripTags which discarded `<strong>` inside `<h3>`.
       nodes.push({
         type: "heading",
         attrs: { level },
-        content: parseInline(stripTags(inner)),
+        content: parseInline(inner),
       });
     } else if (tag === "p") {
       nodes.push({ type: "paragraph", content: parseInline(inner) });
@@ -175,6 +180,131 @@ function decodeEntities(text: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
+}
+
+/**
+ * Convert Skool's TipTap JSON desc format back to HTML.
+ * Inverse of htmlToSkoolDesc: takes "[v2]" + JSON and emits HTML that,
+ * when fed back through htmlToSkoolDesc, reproduces the original structure.
+ */
+export function skoolDescToHtml(desc: string): string {
+  if (!desc) return "";
+  if (!desc.startsWith("[v2]")) return desc;
+  let nodes: unknown;
+  try {
+    nodes = JSON.parse(desc.slice(4));
+  } catch {
+    return "";
+  }
+  if (!Array.isArray(nodes)) return "";
+  return nodes.map(renderSkoolNode).join("");
+}
+
+function escapeHtmlText(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function escapeHtmlAttr(text: string): string {
+  return escapeHtmlText(text).replace(/"/g, "&quot;");
+}
+
+function renderSkoolNode(node: unknown): string {
+  if (!node || typeof node !== "object") return "";
+  const n = node as Record<string, unknown>;
+  const type = n.type as string | undefined;
+  const content = n.content as unknown[] | undefined;
+  const attrs = n.attrs as Record<string, unknown> | undefined;
+
+  switch (type) {
+    case "paragraph":
+      return `<p>${renderSkoolInline(content || [])}</p>`;
+    case "heading": {
+      const rawLevel = (attrs?.level as number) ?? 2;
+      const level = Math.min(4, Math.max(1, rawLevel));
+      return `<h${level}>${renderSkoolInline(content || [])}</h${level}>`;
+    }
+    case "bulletList":
+      return `<ul>${(content || []).map(renderSkoolNode).join("")}</ul>`;
+    case "orderedList":
+      return `<ol>${(content || []).map(renderSkoolNode).join("")}</ol>`;
+    case "listItem": {
+      const inner = (content || [])
+        .map((c) => {
+          const cn = c as Record<string, unknown>;
+          if (cn?.type === "paragraph") {
+            return renderSkoolInline((cn.content as unknown[]) || []);
+          }
+          return renderSkoolNode(c);
+        })
+        .join("");
+      return `<li>${inner}</li>`;
+    }
+    case "codeBlock": {
+      const code = (content || [])
+        .map((c) => {
+          const cn = c as Record<string, unknown>;
+          return typeof cn?.text === "string" ? (cn.text as string) : "";
+        })
+        .join("");
+      return `<pre><code>${escapeHtmlText(code)}</code></pre>`;
+    }
+    case "blockquote": {
+      const inner = (content || [])
+        .map((c) => {
+          const cn = c as Record<string, unknown>;
+          if (cn?.type === "paragraph") {
+            return renderSkoolInline((cn.content as unknown[]) || []);
+          }
+          return renderSkoolNode(c);
+        })
+        .join(" ");
+      return `<blockquote><p>${inner}</p></blockquote>`;
+    }
+    case "horizontalRule":
+      return `<hr>`;
+    case "image": {
+      const src = (attrs?.src as string) || "";
+      const alt = (attrs?.alt as string) || "";
+      return `<img src="${escapeHtmlAttr(src)}" alt="${escapeHtmlAttr(alt)}">`;
+    }
+    case "text":
+      return renderSkoolTextNode(n);
+    default:
+      return "";
+  }
+}
+
+function renderSkoolInline(nodes: unknown[]): string {
+  return nodes
+    .map((n) => {
+      const node = n as Record<string, unknown>;
+      if (node?.type === "text") return renderSkoolTextNode(node);
+      return renderSkoolNode(n);
+    })
+    .join("");
+}
+
+function renderSkoolTextNode(node: Record<string, unknown>): string {
+  const text = (node.text as string) ?? "";
+  let result = escapeHtmlText(text);
+  const marks = (node.marks as Array<Record<string, unknown>>) || [];
+  for (const mark of marks) {
+    const mtype = mark?.type as string | undefined;
+    if (mtype === "bold") result = `<strong>${result}</strong>`;
+    else if (mtype === "italic") result = `<em>${result}</em>`;
+    else if (mtype === "code") result = `<code>${result}</code>`;
+    else if (mtype === "strike") result = `<s>${result}</s>`;
+    else if (mtype === "link") {
+      const href =
+        ((mark.attrs as Record<string, unknown> | undefined)?.href as string) ||
+        "";
+      result = `<a href="${escapeHtmlAttr(href)}" target="_blank">${result}</a>`;
+    }
+  }
+  return result;
 }
 
 /** Parse <li> items from a list */
@@ -564,6 +694,13 @@ export class SkoolApi {
   /**
    * Update an existing page's title, content, video, and/or resources.
    */
+  /** Fetch a single course page (lesson or folder) by ID */
+  async getCoursePage(
+    pageId: string
+  ): Promise<{ status: number; data: Record<string, unknown> }> {
+    return this.request("GET", `/courses/${pageId}`);
+  }
+
   async updatePage(
     pageId: string,
     options: {

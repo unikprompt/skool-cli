@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { htmlToSkoolDesc } from "./skool-api.js";
+import { htmlToSkoolDesc, skoolDescToHtml } from "./skool-api.js";
 
 /** Helper: parse the [v2] prefix and return the nodes array */
 function parseDesc(desc: string): Record<string, unknown>[] {
@@ -222,5 +222,138 @@ describe("__NEXT_DATA__ regex extraction", () => {
     expect(match).not.toBeNull();
     const data = JSON.parse(match![1]);
     expect(data.props.pageProps.users[0].id).toBe("1");
+  });
+});
+
+describe("htmlToSkoolDesc regression: pre vs p alternation", () => {
+  it("parses <pre><code> as a codeBlock, not a paragraph with inline code", () => {
+    const html =
+      '<p><strong>Install:</strong></p><pre><code>curl -fsSL https://example.com/install.sh | bash\n</code></pre><p>Done.</p>';
+    const nodes = parseDesc(htmlToSkoolDesc(html));
+    // Should yield: paragraph, codeBlock, paragraph
+    expect(nodes.map((n) => n.type)).toEqual([
+      "paragraph",
+      "codeBlock",
+      "paragraph",
+    ]);
+    const codeBlock = nodes[1] as Record<string, unknown>;
+    const content = codeBlock.content as Array<Record<string, unknown>>;
+    expect(content[0].text).toContain(
+      "curl -fsSL https://example.com/install.sh | bash"
+    );
+  });
+
+  it("handles multi-line pre blocks with embedded newlines", () => {
+    const html =
+      "<pre><code>line1\nline2\nline3\n</code></pre>";
+    const nodes = parseDesc(htmlToSkoolDesc(html));
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].type).toBe("codeBlock");
+    const content = nodes[0].content as Array<Record<string, unknown>>;
+    expect(content[0].text).toBe("line1\nline2\nline3\n");
+  });
+});
+
+describe("htmlToSkoolDesc regression: inline marks inside headings", () => {
+  it("preserves <strong> inside <h3>", () => {
+    const nodes = parseDesc(
+      htmlToSkoolDesc("<h3><strong>Qué es Claude Code</strong></h3>")
+    );
+    expect(nodes).toHaveLength(1);
+    const heading = nodes[0] as Record<string, unknown>;
+    expect(heading.type).toBe("heading");
+    const content = heading.content as Array<Record<string, unknown>>;
+    expect(content[0]).toEqual({
+      type: "text",
+      text: "Qué es Claude Code",
+      marks: [{ type: "bold" }],
+    });
+  });
+
+  it("preserves <em> inside <h2>", () => {
+    const nodes = parseDesc(htmlToSkoolDesc("<h2><em>título</em></h2>"));
+    const content = nodes[0].content as Array<Record<string, unknown>>;
+    expect(content[0]).toEqual({
+      type: "text",
+      text: "título",
+      marks: [{ type: "italic" }],
+    });
+  });
+});
+
+describe("skoolDescToHtml", () => {
+  it("returns empty string for empty input", () => {
+    expect(skoolDescToHtml("")).toBe("");
+  });
+
+  it("returns input unchanged when not in [v2] format", () => {
+    expect(skoolDescToHtml("<p>raw</p>")).toBe("<p>raw</p>");
+  });
+
+  it("converts a paragraph", () => {
+    expect(skoolDescToHtml(htmlToSkoolDesc("<p>Hello</p>"))).toBe("<p>Hello</p>");
+  });
+
+  it("converts headings h1-h4", () => {
+    expect(skoolDescToHtml(htmlToSkoolDesc("<h1>T1</h1>"))).toBe("<h1>T1</h1>");
+    expect(skoolDescToHtml(htmlToSkoolDesc("<h2>T2</h2>"))).toBe("<h2>T2</h2>");
+    expect(skoolDescToHtml(htmlToSkoolDesc("<h3>T3</h3>"))).toBe("<h3>T3</h3>");
+    expect(skoolDescToHtml(htmlToSkoolDesc("<h4>T4</h4>"))).toBe("<h4>T4</h4>");
+  });
+
+  it("preserves Spanish accents and ñ through round-trip", () => {
+    const original = "<p>Años de experiencia en español, añadiendo tildes á é í ó ú ñ.</p>";
+    expect(skoolDescToHtml(htmlToSkoolDesc(original))).toBe(original);
+  });
+
+  it("converts bold, italic, code, strike, and links", () => {
+    expect(skoolDescToHtml(htmlToSkoolDesc("<p><strong>bold</strong></p>"))).toBe(
+      "<p><strong>bold</strong></p>"
+    );
+    expect(skoolDescToHtml(htmlToSkoolDesc("<p><em>italic</em></p>"))).toBe(
+      "<p><em>italic</em></p>"
+    );
+    expect(skoolDescToHtml(htmlToSkoolDesc("<p><s>strike</s></p>"))).toBe(
+      "<p><s>strike</s></p>"
+    );
+    expect(
+      skoolDescToHtml(
+        htmlToSkoolDesc('<p><a href="https://x.com" target="_blank">link</a></p>')
+      )
+    ).toBe('<p><a href="https://x.com" target="_blank">link</a></p>');
+  });
+
+  it("converts bullet and ordered lists", () => {
+    expect(skoolDescToHtml(htmlToSkoolDesc("<ul><li>A</li><li>B</li></ul>"))).toBe(
+      "<ul><li>A</li><li>B</li></ul>"
+    );
+    expect(skoolDescToHtml(htmlToSkoolDesc("<ol><li>X</li><li>Y</li></ol>"))).toBe(
+      "<ol><li>X</li><li>Y</li></ol>"
+    );
+  });
+
+  it("converts horizontal rules", () => {
+    expect(skoolDescToHtml(htmlToSkoolDesc("<hr>"))).toBe("<hr>");
+  });
+
+  it("escapes HTML special characters in text nodes", () => {
+    const nodes = [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: "a < b & c > d" }],
+      },
+    ];
+    const desc = "[v2]" + JSON.stringify(nodes);
+    expect(skoolDescToHtml(desc)).toBe("<p>a &lt; b &amp; c &gt; d</p>");
+  });
+
+  it("returns empty string for malformed [v2] JSON", () => {
+    expect(skoolDescToHtml("[v2]{not json")).toBe("");
+  });
+
+  it("round-trips a multi-block document", () => {
+    const original =
+      "<h2>Título</h2><p>Introducción con <strong>énfasis</strong> y <em>estilo</em>.</p><ul><li>Año uno</li><li>Año dos</li></ul><p>Fin de la lección.</p>";
+    expect(skoolDescToHtml(htmlToSkoolDesc(original))).toBe(original);
   });
 });

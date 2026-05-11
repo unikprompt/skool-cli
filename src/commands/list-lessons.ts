@@ -27,11 +27,13 @@ export const listLessonsCommand = new Command("list-lessons")
               console.log(`\n  ${item.name}`);
               if (item.children) {
                 for (const child of item.children) {
-                  console.log(`    - ${child.name}`);
+                  const suffix = child.id ? `  [${child.id}]` : "";
+                  console.log(`    - ${child.name}${suffix}`);
                 }
               }
             } else {
-              console.log(`  - ${item.name}`);
+              const suffix = item.id ? `  [${item.id}]` : "";
+              console.log(`  - ${item.name}${suffix}`);
             }
           }
           console.log();

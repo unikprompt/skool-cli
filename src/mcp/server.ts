@@ -280,13 +280,37 @@ server.tool(
 
 server.tool(
   "skool_list_lessons",
-  "List all lessons and folders in a Skool classroom course",
+  "List all lessons and folders in a Skool classroom course (includes page IDs when available)",
   {
     group: z.string().describe("Skool group slug"),
     course: z.string().optional().describe("Course name"),
   },
   async (args) => {
     const result = await client.listLessons(args.group, args.course);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  "skool_get_lesson",
+  "Get a lesson's content (HTML) and metadata. Provide url OR (group + id).",
+  {
+    id: z.string().optional().describe("Lesson page ID"),
+    group: z.string().optional().describe("Skool group slug"),
+    course: z.string().optional().describe("Course name hint"),
+    course_short_id: z.string().optional().describe("Course short ID"),
+    url: z.string().optional().describe("Full lesson URL"),
+  },
+  async (args) => {
+    const result = await client.getLesson({
+      pageId: args.id,
+      group: args.group,
+      courseName: args.course,
+      courseShortId: args.course_short_id,
+      url: args.url,
+    });
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };

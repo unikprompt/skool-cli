@@ -25,6 +25,7 @@ import { editLessonCommand } from "./commands/edit-lesson.js";
 import { moveLessonCommand } from "./commands/move-lesson.js";
 import { deleteLessonCommand } from "./commands/delete-lesson.js";
 import { listLessonsCommand } from "./commands/list-lessons.js";
+import { getLessonCommand } from "./commands/get-lesson.js";
 
 const pkg = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf-8")
@@ -56,6 +57,7 @@ program.addCommand(editLessonCommand);
 program.addCommand(moveLessonCommand);
 program.addCommand(deleteLessonCommand);
 program.addCommand(listLessonsCommand);
+program.addCommand(getLessonCommand);
 
 // Calendar
 import { createEventCommand } from "./commands/create-event.js";
