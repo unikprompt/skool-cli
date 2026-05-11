@@ -841,32 +841,66 @@ export class SkoolClient {
   }
 
   /**
-   * Navigate to a group's classroom (optionally picking a course by name) and
-   * extract the pageProps.course tree from __NEXT_DATA__. Returns the raw
-   * tree along with the courseShortId captured from the final URL.
+   * Navigate to a group's classroom and extract the full pageProps.course
+   * tree from __NEXT_DATA__.
+   *
+   * Resolves the course's URL slug from pageProps.allCourses on the
+   * classroom landing (the `name` field on each course IS the slug), then
+   * navigates directly to the course URL so __NEXT_DATA__ contains the
+   * full server-rendered course tree.
+   *
+   * Avoids two failure modes of the previous click-then-read approach:
+   * 1. `getByText(courseName).first()` resolved to a <div class="CourseTitle">
+   *    that is not always reliably clickable across Skool group themes.
+   * 2. Even when the click succeeded, Skool routes client-side via Next.js;
+   *    the __NEXT_DATA__ script tag retains the original landing payload
+   *    and does not refresh with the new course's tree. The result was a
+   *    null or partial `pageProps.course` (only the active module loaded,
+   *    not the sibling modules' children) — exactly the bug seen with
+   *    operadores-aumentados / "Caja de Herramientas" returning 3 folders
+   *    where only the active one had children.
    */
   private async fetchCourseTree(
     groupSlug: string,
     courseName?: string
   ): Promise<{ courseShortId: string; rootNode: unknown } | null> {
     const page = await this.browser.getPage();
-    await this.ops.gotoClassroom(groupSlug);
-    if (courseName) {
-      try {
-        await page
-          .getByText(courseName, { exact: false })
-          .first()
-          .click({ timeout: 8000 });
-      } catch {
-        // Not a fatal error — the classroom may already show the course
-      }
-      await page.waitForTimeout(2500);
-    } else {
-      await page.waitForTimeout(1500);
-    }
 
-    const currentUrl = page.url();
-    const courseShortId = extractCourseShortIdFromUrl(currentUrl);
+    // Step 1: load classroom landing and pull the course list
+    await this.ops.gotoClassroom(groupSlug);
+    await page.waitForTimeout(1500);
+
+    const allCourses = await page.evaluate(() => {
+      const s = document.querySelector("script#__NEXT_DATA__");
+      if (!s || !s.textContent) return [];
+      try {
+        const d = JSON.parse(s.textContent);
+        const list = d?.props?.pageProps?.allCourses;
+        if (!Array.isArray(list)) return [];
+        return list.map((c: Record<string, unknown>) => ({
+          shortId: (c.name as string) || "",
+          title:
+            ((c.metadata as Record<string, unknown> | undefined)?.title as string) ||
+            "",
+        }));
+      } catch {
+        return [];
+      }
+    });
+
+    // Step 2: pick a course (by name match if provided, else first)
+    let target = allCourses[0];
+    if (courseName && allCourses.length > 0) {
+      const needle = courseName.toLowerCase();
+      const match = allCourses.find((c) => c.title.toLowerCase().includes(needle));
+      if (match) target = match;
+    }
+    if (!target || !target.shortId) return null;
+
+    // Step 3: navigate directly to the course URL for a fresh SSR payload
+    const courseUrl = `https://www.skool.com/${groupSlug}/classroom/${target.shortId}`;
+    await page.goto(courseUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.waitForTimeout(2000);
 
     const treeJson = await page.evaluate(() => {
       const script = document.querySelector("script#__NEXT_DATA__");
@@ -878,7 +912,7 @@ export class SkoolClient {
       ?.pageProps as Record<string, unknown> | undefined;
     const rootNode = pageProps?.course;
     if (!rootNode) return null;
-    return { courseShortId, rootNode };
+    return { courseShortId: target.shortId, rootNode };
   }
 
   /**
