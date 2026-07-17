@@ -1,7 +1,12 @@
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
-import { mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR, HEADLESS, DEFAULT_TIMEOUT } from "./config.js";
+import {
+  ensurePrivateDirectory,
+  ensurePrivateFile,
+  writePrivateFile,
+} from "./file-security.js";
 
 /** Path to saved auth state (cookies + localStorage) */
 const AUTH_STATE_PATH = join(DATA_DIR, "auth-state.json");
@@ -30,9 +35,7 @@ export class BrowserManager {
     }
 
     // Ensure data dir exists
-    if (!existsSync(DATA_DIR)) {
-      mkdirSync(DATA_DIR, { recursive: true });
-    }
+    ensurePrivateDirectory(DATA_DIR);
 
     if (!this.browser) {
       this.browser = await chromium.launch({
@@ -51,6 +54,7 @@ export class BrowserManager {
       };
 
       if (existsSync(AUTH_STATE_PATH)) {
+        ensurePrivateFile(AUTH_STATE_PATH);
         contextOptions.storageState = AUTH_STATE_PATH;
       }
 
@@ -79,11 +83,8 @@ export class BrowserManager {
   async saveAuthState(): Promise<void> {
     if (!this.context) return;
 
-    if (!existsSync(DATA_DIR)) {
-      mkdirSync(DATA_DIR, { recursive: true });
-    }
-
-    await this.context.storageState({ path: AUTH_STATE_PATH });
+    const state = await this.context.storageState();
+    writePrivateFile(AUTH_STATE_PATH, JSON.stringify(state));
   }
 
   /** Check if saved auth state exists on disk */

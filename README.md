@@ -12,6 +12,36 @@ npx playwright install chromium
 skool login --email you@email.com --password yourpass
 ```
 
+## Credential Security
+
+After a successful login, skool-cli stores the browser session it needs for
+later commands in `~/.skool-cli/auth-state.json` (or in
+`$SKOOL_CLI_DATA_DIR/auth-state.json` when that environment variable is set).
+This file contains authentication cookies and must be treated like a password.
+
+On macOS and Linux, skool-cli automatically:
+
+- creates the data directory with permissions `0700`;
+- writes `auth-state.json` with permissions `0600`;
+- writes the optional `telegram.json` bot configuration with permissions
+  `0600`; and
+- repairs more permissive permissions from older installations the next time
+  the relevant file is read or saved.
+
+No extra flag or setup step is required. Log in and use the CLI normally:
+
+```bash
+skool login --email you@email.com --password yourpass
+skool whoami --group my-community
+```
+
+Windows uses the account's normal filesystem ACLs because POSIX permission
+bits are not available. On every platform, do not commit, copy, or share files
+from the skool-cli data directory. Avoid using a shared OS account, and remember
+that supplying a password directly on the command line may save it in shell
+history; prefer a temporary environment variable or another history-safe
+method supported by your shell.
+
 ## Commands (37)
 
 ### Authentication
