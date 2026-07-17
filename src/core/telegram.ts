@@ -1,6 +1,6 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
 import { TELEGRAM_CONFIG_FILE } from "./config.js";
+import { ensurePrivateFile, writePrivateFile } from "./file-security.js";
 
 export interface TelegramConfig {
   botToken: string;
@@ -18,6 +18,7 @@ export function loadTelegramConfig(): TelegramConfig | null {
 
   try {
     if (!existsSync(TELEGRAM_CONFIG_FILE)) return null;
+    ensurePrivateFile(TELEGRAM_CONFIG_FILE);
     const raw = readFileSync(TELEGRAM_CONFIG_FILE, "utf-8");
     const data = JSON.parse(raw) as TelegramConfig;
     if (!data.botToken || !data.chatId) return null;
@@ -29,12 +30,9 @@ export function loadTelegramConfig(): TelegramConfig | null {
 
 /** Save Telegram config to disk */
 export function saveTelegramConfig(botToken: string, chatId: string): void {
-  const dir = dirname(TELEGRAM_CONFIG_FILE);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(
+  writePrivateFile(
     TELEGRAM_CONFIG_FILE,
-    JSON.stringify({ botToken, chatId }, null, 2),
-    "utf-8"
+    JSON.stringify({ botToken, chatId }, null, 2)
   );
 }
 
